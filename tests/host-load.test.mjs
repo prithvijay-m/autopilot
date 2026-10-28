@@ -29,7 +29,7 @@ test("CLI prints one line and exits 0, whatever it is given", () => {
   for (const arg of [["5"], ["0"], ["x"], []]) {
     const r = node(process.cwd(), "host-load.mjs", arg);
     assert.equal(r.status, 0);
-    assert.match(r.out, /^lanes: [1-9]\d* of [1-9]\d* \(load [\d.]+ on \d+ cores, [\d.]+ GB free\)$/);
+    assert.match(r.out, /^lanes: [1-9]\d* of [1-9]\d* \(cores [\d.]+, load [\d.]+, free [\d.]+ of [\d.]+ GB, reserve [\d.]+ GB, bound by (plan|cpu|memory)\)$/);
   }
 });
 
