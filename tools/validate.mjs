@@ -23,7 +23,7 @@ const FUTURE_OK = (rel) => /^docs\/(plans|improvements)\//.test(rel);
 const read = (p) => readFileSync(p, "utf8");
 const json = (p) => JSON.parse(read(p));
 
-function walk(dir, skip = new Set(["node_modules", ".git", "graphify-out", ".autopilot"])) {
+function walk(dir, skip = new Set(["node_modules", ".git", "graphify-out", ".autopilot", ".impeccable"])) {
   const out = [];
   for (const e of readdirSync(dir, { withFileTypes: true })) {
     if (skip.has(e.name)) continue;

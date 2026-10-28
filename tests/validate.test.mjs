@@ -101,3 +101,12 @@ test("plans and proposals may name what is not built yet", () => {
     }
   }
 });
+
+test("tool caches are not walked", () => {
+  const t = fixture({ ...GOOD, ".impeccable/hook.cache.json": `{"p":"/x/${OLD_B}"}` });
+  try {
+    assert.deepEqual(validate(t.dir).errors, []);
+  } finally {
+    t.cleanup();
+  }
+});
