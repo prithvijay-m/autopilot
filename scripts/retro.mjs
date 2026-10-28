@@ -6,7 +6,7 @@
 //   node retro.mjs <RUN> [--out <repo root>] [--date YYYY-MM-DD]
 //
 // Prints `retro: none`, `retro: <n> repeated problems -> <path>` or `retro: no ledger at <path>`.
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { applicable, detectStack, load, projectRoot } from "./lessons.mjs";
@@ -62,10 +62,28 @@ export function proposal({ plan, run, date, problems: ps }) {
   ].join("\n");
 }
 
+// existsSync is false for a dangling link, so a link counts as taken.
+const present = (p) => {
+  try {
+    lstatSync(p);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const realDir = (p) => {
+  try {
+    return lstatSync(p).isDirectory();
+  } catch (e) {
+    return e.code === "ENOENT";
+  }
+};
+
 export function proposalPath(root, date, slug) {
   const dir = join(root, "docs", "improvements");
   let file = join(dir, `${date}-${slug}.md`);
-  for (let n = 2; existsSync(file); n++) file = join(dir, `${date}-${slug}-${n}.md`);
+  for (let n = 2; present(file); n++) file = join(dir, `${date}-${slug}-${n}.md`);
   return file;
 }
 
@@ -85,8 +103,16 @@ function main(args) {
   if (!ps.length) return console.log("retro: none");
   const plan = /^# autopilot ledger:\s*(.+)$/m.exec(ledger)?.[1].trim() ?? run;
   const file = proposalPath(root, date, slugOf(plan));
-  mkdirSync(join(root, "docs", "improvements"), { recursive: true });
-  writeFileSync(file, proposal({ plan, run, date, problems: ps }));
+  const dir = join(root, "docs", "improvements");
+  const refuse = () => console.log(`retro: refused (a link in the path of ${fwd(file)}); nothing written`);
+  if (![join(root, "docs"), dir].every(realDir)) return refuse();
+  try {
+    mkdirSync(dir, { recursive: true });
+    if (![join(root, "docs"), dir].every((d) => lstatSync(d).isDirectory())) return refuse();
+    writeFileSync(file, proposal({ plan, run, date, problems: ps }), { flag: "wx" });
+  } catch {
+    return refuse();
+  }
   console.log(`retro: ${ps.length} repeated problems -> ${fwd(file)}`);
 }
 
