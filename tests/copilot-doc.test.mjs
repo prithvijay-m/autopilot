@@ -141,5 +141,5 @@ test("spawns nothing", () => {
 });
 
 test("no old names", () => {
-  for (const t of [copilots, procedure]) assert.doesNotMatch(t, /autopilot-forge|claude-code-forge/);
+  for (const t of [copilots, procedure]) assert.doesNotMatch(t, new RegExp([["autopilot", "forge"].join("-"), ["claude", "code", "forge"].join("-")].join("|")));
 });
