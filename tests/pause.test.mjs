@@ -52,7 +52,8 @@ describe("pause CLI", () => {
     for (const bad of ["../x", "a/b", "a\\b", "..", ".hidden", "a..b", "", "-x"]) {
       const o = node(r.dir, "pause.mjs", ["set", bad, "why"]);
       assert.equal(o.status, 0);
-      assert.equal(o.out, `pause: refused plan name "${bad}"`);
+      // the echoed name goes through the allowlist too
+      assert.equal(o.out, `pause: refused plan name "${sanitize(bad)}"`);
     }
     assert.ok(!existsSync(join(r.dir, "x")));
     assert.ok(!existsSync(join(r.dir, ".autopilot", "x")));
