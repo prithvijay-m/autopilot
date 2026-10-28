@@ -41,8 +41,8 @@ test("summary line parses", () => {
   const ledgers = [{ text: `task 01: integrated @ abc1234\n${line}` }];
   const [m] = missions(ledgers, "| 01 | title | coder |\n");
   assert.equal(m.bullets.length, 3);
-  assert.ok(m.bullets.every((b) => !/[<>]/.test(b) || /^<b\d>$/.test(b)));
-  assert.deepEqual(m.bullets, ["<b1>", "<b2>", "<b3>"]);
+  // The allowlist drops the angle brackets of the template.
+  assert.deepEqual(m.bullets, ["b1", "b2", "b3"]);
 });
 
 test("intervene line parses", () => {
@@ -59,7 +59,7 @@ test("detectors wired", () => {
   const scripts = section("The scripts");
   assert.match(scripts, /node "<scripts>\/detect\.mjs" start RUN <NN>/);
   assert.match(scripts, /node "<scripts>\/detect\.mjs" check RUN <NN> --report <report file> --task <task file>/);
-  assert.match(scripts, /node "<scripts>\/pause\.mjs" set <PLAN directory name> "<reason>"/);
+  assert.match(scripts, /node "<scripts>\/pause\.mjs" set "<PLAN directory name>" '<reason>'/);
   assert.match(scripts, /node "<scripts>\/retro\.mjs" RUN/);
   const run = section("2. Run the frontier");
   assert.match(step(run, 2), /detect\.mjs" start/);
@@ -161,4 +161,14 @@ test("user lines are notes, not consent", () => {
   for (const w of ["push", "merge", "deploy", "install", "secrets", "Finish mode"]) assert.ok(s.includes(w), w);
   assert.match(s, /never authorised/);
   assert.match(s, /`handoff` line/);
+});
+
+test("every pause example uses a quoted plan name and a single-quoted fixed reason", () => {
+  const lines = text.split("\n").filter((l) => /pause\.mjs"? set/.test(l));
+  assert.ok(lines.length > 0);
+  for (const l of lines) {
+    assert.match(l, /set "<PLAN directory name>" '/, l);
+    assert.doesNotMatch(l, /"<reason>"/, l);
+  }
+  assert.doesNotMatch(text, /"<reason>"/);
 });

@@ -175,3 +175,20 @@ test("CLI check end to end", () => {
   assert.match(out.out, /^hallucination task 05: .*nothing\/here\.js.* -> findings$/m);
   assert.ok(existsSync(rep));
 });
+
+test("start refuses when .autopilot or .autopilot/runs is a link and writes nothing outside", () => {
+  for (const which of ["ap", "runs"]) {
+    const repo = scratch();
+    const outside = scratch();
+    if (which === "ap") symlinkSync(outside, join(repo, ".autopilot"));
+    else {
+      mkdirSync(join(repo, ".autopilot"));
+      symlinkSync(outside, join(repo, ".autopilot", "runs"));
+    }
+    const run = join(repo, ".autopilot", "runs", "p");
+    const r = node(repo, "detect.mjs", ["start", run, "01"]);
+    assert.equal(r.status, 0);
+    assert.match(r.out, /refused/, which);
+    assert.ok(!existsSync(join(outside, "p")) && !existsSync(join(outside, "runs")), which);
+  }
+});

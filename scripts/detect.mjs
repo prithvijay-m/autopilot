@@ -9,7 +9,7 @@
 // `intervene: task NN <signal> -> <remedy>`. A second trip after that line pauses the run instead.
 import { spawnSync } from "node:child_process";
 import { existsSync, lstatSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
-import { isAbsolute, join, resolve } from "node:path";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { similarity } from "./lessons.mjs";
 
@@ -158,9 +158,10 @@ const plainOrAbsent = (p) => {
 function start(run, nn) {
   const file = join(run, "clock.json");
   const refuse = () => console.log(`clock: refused (a link or non-file in the path of ${file.replace(/\\/g, "/")}); nothing written`);
-  if (!realDir(run) || !plainOrAbsent(file)) return refuse();
+  const dirs = [dirname(dirname(run)), dirname(run), run];
+  if (!dirs.every(realDir) || !plainOrAbsent(file)) return refuse();
   mkdirSync(run, { recursive: true });
-  if (!lstatSync(run).isDirectory()) return refuse();
+  if (!dirs.every(realDir)) return refuse();
   const iso = new Date().toISOString();
   const tmp = join(run, `.clock.json.${process.pid}`);
   try {

@@ -87,9 +87,9 @@ Read [PREVIEW.md](../cockpit/PREVIEW.md) in full and carry it out with PLAN, bef
 
 Then show the user the goal in one sentence, the Task graph, the Contract, and every Delegated decision from the planner's report, and ask whether to approve or change the plan. This approval is the last thing the build asks of them, so a change here loops back to the step it touches.
 
-Once approved, set `Status` in `plan.md` to `approved <YYYY-MM-DD>`. When `/autopilot` is running this procedure, planning is done: return to it, and it builds next. Typed on its own, end with exactly this, the path filled in:
+Once approved, set `Status` in `plan.md` to `approved <YYYY-MM-DD>`. When `/autopilot` is running this procedure, planning is done: return to it, and it builds next. Typed on its own, end with exactly this, the plan directory name filled in on the last line:
 
 ```
 Blueprint approved: <PLAN>
-Build it hands-free, now or later, with: /autopilot <PLAN>
+Build it hands-free, now or later, with: /autopilot:build <YYYY-MM-DD>-<slug>
 ```

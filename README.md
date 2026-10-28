@@ -133,7 +133,7 @@ Spending fewer tokens (a transcript reader, an image guard, a per-session rea la
 ## Usage
 
 - **Build:** `/autopilot add a refunds feature to the billing module`, or approve a plan and run `/autopilot:build`
-- **Plan now, build later:** `/blueprint ...`, then `/autopilot docs/plans/<dir>`
+- **Plan now, build later:** `/blueprint ...`, then `/autopilot:build 2026-10-28-autopilot-improvements` (the plan directory name under `docs/plans/`, never a path)
 - **Skip the pipeline for a one-liner:** start the prompt with `quick:` — no interview, no subagents.
 - **Route build prompts to a skill of your own:** set `AUTOPILOT_SKILL=autopilot` or put the skill name in `~/.claude/autopilot-auto.skill`. The clash note under [Commands](#name-clash) says why. Switch the routing off with `~/.claude/autopilot-auto.off` or `AUTOPILOT_AUTO=0`.
 - **Check a branch:** `/verify`

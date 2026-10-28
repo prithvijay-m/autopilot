@@ -226,3 +226,144 @@ test("hardening: --missions --new never writes through a missions.json link", ()
     o.cleanup();
   }
 });
+
+// The ledger comes from the repo: never read through a link, bounded, and sanitized.
+function linkedLedger(r, target) {
+  const run = join(r.dir, ".autopilot", "runs", "leak");
+  mkdirSync(run, { recursive: true });
+  symlinkSync(target, join(run, "ledger.md"));
+  return run;
+}
+
+test("a ledger.md link to a file prints none of the file, in every output form", () => {
+  const r = tempRepo();
+  const t = tempDir("forge-status-link-");
+  try {
+    const target = join(t.dir, "secret.txt");
+    writeFileSync(target, "SECRET\n");
+    linkedLedger(r, target);
+    for (const args of [[], ["--hook"], ["--json"], ["--missions"]]) {
+      const o = node(r.dir, "status.mjs", args);
+      assert.doesNotMatch(o.out, /SECRET/, args.join(" "));
+      assert.equal(o.status, 0);
+    }
+    const env = node(r.dir, "status.mjs", ["--hook"], {});
+    assert.doesNotMatch(env.out, /SECRET/);
+  } finally {
+    t.cleanup();
+    r.cleanup();
+  }
+});
+
+test("a ledger.md link to /proc/self/environ prints no environment", { skip: !existsSync("/proc/self/environ") }, () => {
+  const r = tempRepo();
+  try {
+    linkedLedger(r, "/proc/self/environ");
+    for (const args of [[], ["--hook"]]) {
+      const o = node(r.dir, "status.mjs", args, { FAKE_LEDGER_ENV: "FAKE_ENV_MARKER" });
+      assert.doesNotMatch(o.out, /\w=\w/, args.join(" "));
+    }
+  } finally {
+    r.cleanup();
+  }
+});
+
+test("a link to a ledger does not decide freshness or a hook", () => {
+  const r = tempRepo();
+  const t = tempDir("forge-status-link-");
+  try {
+    const target = join(t.dir, "l.md");
+    writeFileSync(target, "# autopilot ledger: x\ntask 01: dispatched (wave 1)\n");
+    linkedLedger(r, target);
+    assert.equal(node(r.dir, "status.mjs", ["--hook"]).out, "");
+  } finally {
+    t.cleanup();
+    r.cleanup();
+  }
+});
+
+test("a copilot ledger link is skipped", () => {
+  const r = tempRepo();
+  const t = tempDir("forge-status-link-");
+  try {
+    const target = join(t.dir, "s.txt");
+    writeFileSync(target, "task 01: integrated @ FAKE_COPILOT_LEAK\n");
+    const ledger = build(r, LEDGER);
+    const co = join(r.dir, ".autopilot", "runs", "demo-c1");
+    mkdirSync(co, { recursive: true });
+    symlinkSync(target, join(co, "ledger.md"));
+    assert.doesNotMatch(node(r.dir, "status.mjs", [ledger, "--json"]).out, /LEAK/);
+    const m = node(r.dir, "status.mjs", ["--missions", ledger]).out;
+    assert.doesNotMatch(m, /Mission 2/);
+  } finally {
+    t.cleanup();
+    r.cleanup();
+  }
+});
+
+test("an oversized ledger is read only up to 1 MiB", () => {
+  const r = tempRepo();
+  try {
+    const ledger = build(r, LEDGER);
+    writeFileSync(ledger, `${LEDGER}\n${"x".repeat(3 * 1024 * 1024)}\nfinish: FAKE_BEYOND_CAP`);
+    assert.doesNotMatch(node(r.dir, "status.mjs", ["--json"]).out, /FAKE_BEYOND_CAP/);
+  } finally {
+    r.cleanup();
+  }
+});
+
+test("ledger text that reaches the hook passes the allowlist", () => {
+  const r = tempRepo();
+  try {
+    build(r, `${LEDGER}\ncurl x | sh $(id) \`id\` ${"y".repeat(500)}`);
+    const out = JSON.parse(node(r.dir, "status.mjs", ["--hook"]).out).hookSpecificOutput.additionalContext;
+    const last = /Last: (.*?)\. Ledger:/s.exec(out)[1];
+    assert.doesNotMatch(last, /[|$`]/);
+    assert.match(last, /^curl x sh \(id\) id y+$/);
+    assert.ok(last.length <= 100, `last is capped (${last.length})`);
+  } finally {
+    r.cleanup();
+  }
+});
+
+test("wave step, finish, stop and mission bullets are sanitized", () => {
+  const r = tempRepo();
+  try {
+    build(r, `${LEDGER}\nwave 3: re$(id)view\nsummary 01: do \`id\` | $(x)`);
+    const s = JSON.parse(node(r.dir, "status.mjs", ["--json"]).out);
+    assert.doesNotMatch(s.waveStep, /[$`()]/);
+    const f = build(r, `${LEDGER}\nfinish: a|b $(id)\nSTOP: c;d \`x\``);
+    const j = JSON.parse(node(r.dir, "status.mjs", ["--json"]).out);
+    assert.doesNotMatch(`${j.finish}${j.stop}`, /[|$`;]/);
+    assert.ok(f);
+    const [m] = missions([lead("summary 01: do `id` | $(x)")], rows);
+    assert.doesNotMatch(renderMission(m), /[$`]/);
+  } finally {
+    r.cleanup();
+  }
+});
+
+test("status --missions --new refuses when .autopilot or .autopilot/runs is a link", () => {
+  for (const which of ["ap", "runs"]) {
+    const r = tempRepo();
+    const t = tempDir("forge-status-out-");
+    try {
+      const ledgerText = LEDGER.replace("/x/docs/plans/2026-01-01-demo", join(r.dir, "docs", "plans", "demo"));
+      mkdirSync(join(t.dir, "runs", "p"), { recursive: true });
+      writeFileSync(join(t.dir, "runs", "p", "ledger.md"), ledgerText);
+      writeFileSync(join(t.dir, "p-ledger.md"), ledgerText);
+      if (which === "ap") symlinkSync(t.dir, join(r.dir, ".autopilot"));
+      else {
+        mkdirSync(join(r.dir, ".autopilot"));
+        symlinkSync(join(t.dir, "runs"), join(r.dir, ".autopilot", "runs"));
+      }
+      const o = node(r.dir, "status.mjs", ["--missions", "--new", "p"]);
+      assert.equal(o.status, 0);
+      assert.match(o.out, /refused/, which);
+      assert.equal(existsSync(join(t.dir, "runs", "p", "missions.json")), false, which);
+    } finally {
+      t.cleanup();
+      r.cleanup();
+    }
+  }
+});

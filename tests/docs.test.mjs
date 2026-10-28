@@ -85,3 +85,15 @@ test("migration note", () => {
   const entry = changelog.split(/^## 0\.2\.2/m)[0];
   assert.ok(entry.includes("A build started on 0.2.x keeps its ledger at the old path: finish it on 0.2.x."));
 });
+
+test("the plan argument is a plan directory name, never a path", () => {
+  for (const p of ["commands/build.md", "commands/resume.md"]) {
+    assert.match(read(p), /argument-hint: "\[plan directory name\]"/, p);
+    assert.doesNotMatch(read(p), /plan name or path/, p);
+  }
+  assert.doesNotMatch(read("README.md"), /\/autopilot docs\/plans\//);
+  assert.match(read("README.md"), /\/autopilot:build 2026-10-28-autopilot-improvements/);
+  const bp = read("skills/blueprint/SKILL.md");
+  assert.match(bp, /Build it hands-free, now or later, with: \/autopilot:build <YYYY-MM-DD>-<slug>/);
+  assert.doesNotMatch(bp, /with: \/autopilot <PLAN>/);
+});
