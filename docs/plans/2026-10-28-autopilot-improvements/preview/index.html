@@ -1,0 +1,414 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Autopilot 0.3.0: preview</title>
+<style>
+:root{
+  --bg:#0d1117;--panel:#151b23;--panel2:#1c2430;--line:#2a3442;--text:#e6e9ee;--muted:#9aa5b4;
+  --amber:#f2b33d;--green:#4cc38a;--red:#ef6b6b;--blue:#6ab0ff;--shadow:0 1px 0 rgba(255,255,255,.03) inset;
+  --on-accent:#1a1300;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme=dark]){--bg:#f1f4f8;--panel:#ffffff;--panel2:#e7ecf2;--line:#cfd7e1;--text:#1d232b;--muted:#5d6672;--amber:#8a5700;--green:#1b7a4c;--red:#b83434;--blue:#1f6fd1;--on-accent:#ffffff;--shadow:none}
+}
+:root[data-theme=light]{--bg:#f1f4f8;--panel:#ffffff;--panel2:#e7ecf2;--line:#cfd7e1;--text:#1d232b;--muted:#5d6672;--amber:#8a5700;--green:#1b7a4c;--red:#b83434;--blue:#1f6fd1;--on-accent:#ffffff;--shadow:none}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 var(--sans)}
+header{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line)}
+.bar{display:flex;align-items:center;gap:.75rem;padding:.7rem 1rem;max-width:980px;margin:0 auto}
+.logo{font:600 15px var(--mono);letter-spacing:.02em}
+.logo b{color:var(--amber)}
+.bar .sp{flex:1}
+button,.btn{font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--panel2);color:var(--text);border-radius:8px;padding:.45rem .8rem;min-height:38px}
+button:hover{border-color:var(--amber)}
+button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+button.primary{background:var(--amber);border-color:var(--amber);color:var(--on-accent);font-weight:600}
+button.ghost{background:transparent}
+button:disabled{opacity:.45;cursor:not-allowed}
+nav{display:flex;gap:.25rem;overflow-x:auto;padding:0 1rem .55rem;max-width:980px;margin:0 auto;scrollbar-width:none}
+nav::-webkit-scrollbar{display:none}
+nav button{white-space:nowrap;border-radius:999px;padding:.3rem .8rem;min-height:34px;background:transparent}
+nav button[aria-selected=true]{background:var(--panel2);border-color:var(--amber);color:var(--amber)}
+main{max-width:980px;margin:0 auto;padding:1rem}
+section[role=tabpanel]{display:none}
+section[role=tabpanel].on{display:block}
+h1{font-size:1.35rem;margin:.2rem 0 .3rem}
+h2{font-size:1.05rem;margin:1.2rem 0 .5rem}
+p.lead{color:var(--muted);margin:.1rem 0 1rem;max-width:62ch}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:1rem;box-shadow:var(--shadow)}
+.grid{display:grid;gap:1rem}
+@media(min-width:760px){.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:1.2fr .8fr}}
+.mono{font-family:var(--mono);font-size:13.5px}
+.muted{color:var(--muted)}
+.tag{display:inline-block;font:12px var(--mono);border:1px solid var(--line);border-radius:6px;padding:0 .4rem;color:var(--muted)}
+.tag.amber{color:var(--amber);border-color:var(--amber)}
+.tag.green{color:var(--green);border-color:var(--green)}
+.tag.red{color:var(--red);border-color:var(--red)}
+.row{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}
+/* palette */
+.palette{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--panel)}
+.palette .in{display:flex;align-items:center;gap:.25rem;padding:.6rem .8rem;border-bottom:1px solid var(--line);font-family:var(--mono)}
+.palette .in span{color:var(--amber)}
+.palette input{flex:1;background:transparent;border:0;color:var(--text);font:inherit;min-width:0}
+.palette input:focus-visible{outline:none}
+.palette ul{list-style:none;margin:0;padding:.3rem;max-height:420px;overflow:auto}
+.palette li button{width:100%;text-align:left;display:grid;grid-template-columns:minmax(150px,auto) 1fr;gap:.8rem;border:0;background:transparent;border-radius:8px;padding:.5rem .6rem}
+.palette li button[aria-current=true],.palette li button:hover{background:var(--panel2)}
+.palette li .n{font-family:var(--mono);color:var(--amber)}
+.palette li .d{color:var(--muted);font-size:14px}
+@media(max-width:520px){.palette li button{grid-template-columns:1fr;gap:.1rem}}
+.detail dt{font:12px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:.7rem}
+.detail dd{margin:.15rem 0 0}
+pre{margin:0;white-space:pre-wrap;word-break:break-word;font:13px/1.55 var(--mono);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:.7rem .8rem}
+/* feed */
+.feed{display:flex;flex-direction:column;gap:.6rem;min-height:120px}
+.msg{border-left:3px solid var(--amber);background:var(--panel2);border-radius:0 8px 8px 0;padding:.55rem .75rem;animation:in .25s ease-out}
+.msg.sys{border-left-color:var(--blue)}
+.msg.warn{border-left-color:var(--red)}
+.msg.ok{border-left-color:var(--green)}
+.msg .who{font:12px var(--mono);color:var(--muted)}
+.msg .line{font-weight:600}
+.msg ul{margin:.25rem 0 0;padding-left:1.1rem;color:var(--muted)}
+@keyframes in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion: reduce){.msg{animation:none}}
+.prog{height:8px;border-radius:99px;background:var(--panel2);border:1px solid var(--line);overflow:hidden}
+.prog i{display:block;height:100%;width:0;background:var(--amber);transition:width .3s}
+.lanes{display:grid;grid-template-columns:repeat(3,1fr);gap:.4rem}
+.lane{border:1px dashed var(--line);border-radius:8px;padding:.35rem .5rem;font:12.5px var(--mono);min-height:52px}
+.lane b{display:block;color:var(--muted);font-weight:400}
+.lane.busy{border-style:solid;border-color:var(--amber)}
+/* host */
+.ctl{display:grid;grid-template-columns:1fr auto;gap:.15rem .6rem;align-items:center;margin:.45rem 0}
+.ctl label{font-size:14px}
+.ctl output{font:13px var(--mono);color:var(--amber)}
+.ctl input[type=range]{grid-column:1/-1;width:100%;accent-color:var(--amber)}
+.ctl input[type=checkbox]{accent-color:var(--amber)}
+.readout{font:600 14px/1.5 var(--mono);color:var(--green)}
+.gauge{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;margin-top:.7rem}
+.gauge div{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:.5rem;text-align:center}
+.gauge div.bind{border-color:var(--amber)}
+.gauge small{display:block;color:var(--muted);font-size:12px}
+.gauge strong{font:600 20px var(--mono)}
+/* steps */
+.steps{display:flex;gap:.4rem;flex-wrap:wrap;margin:.3rem 0 1rem;padding:0;list-style:none}
+.steps li{font:12.5px var(--mono);border:1px solid var(--line);border-radius:99px;padding:.2rem .65rem;color:var(--muted)}
+.steps li.now{border-color:var(--amber);color:var(--amber)}
+.steps li.done{border-color:var(--green);color:var(--green)}
+textarea,input[type=text]{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:8px;color:var(--text);font:inherit;padding:.55rem .65rem}
+.mock{border:1px solid var(--line);border-radius:10px;padding:.8rem;background:var(--bg)}
+.mock .phone{max-width:260px;margin:0 auto;border:1px solid var(--line);border-radius:18px;padding:.7rem;background:var(--panel)}
+.mock .phone .btnm{margin-top:.6rem;width:100%;border-radius:10px;padding:.5rem;text-align:center;color:var(--on-accent);font-weight:600}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:.45rem .4rem;border-bottom:1px solid var(--line);vertical-align:top}
+th{font:12px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+td code{font:12.5px var(--mono);background:var(--panel2);padding:.05rem .3rem;border-radius:4px}
+.tablewrap{overflow-x:auto}
+.diff .add{color:var(--green)}.diff .del{color:var(--red)}.diff .hd{color:var(--blue)}
+.note{font-size:13.5px;color:var(--muted);margin-top:.6rem}
+.flag{display:flex;gap:.5rem;align-items:flex-start;background:var(--panel2);border:1px solid var(--red);border-radius:8px;padding:.5rem .7rem;margin:.5rem 0;font-size:14px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+footer{max-width:980px;margin:0 auto;padding:1rem;color:var(--muted);font-size:13px}
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <div class="logo">/<b>autopilot</b>:  <span class="muted">0.3.0 preview</span></div>
+    <div class="sp"></div>
+    <button class="ghost" id="theme" aria-label="Switch light or dark">Day / Night</button>
+  </div>
+  <nav role="tablist" aria-label="Preview sections" id="tabs"></nav>
+</header>
+<main id="main"></main>
+<footer>Mocked data throughout. Nothing here runs a command, reads your disk, or calls the network. Plan: docs/plans/2026-10-28-autopilot-improvements.</footer>
+
+<script>
+(function(){
+"use strict";
+const $=(s,r=document)=>r.querySelector(s);
+const el=(tag,attrs={},...kids)=>{const e=document.createElement(tag);for(const[k,v]of Object.entries(attrs)){if(k==="class")e.className=v;else if(k==="html")e.innerHTML=v;else if(k.startsWith("on"))e.addEventListener(k.slice(2),v);else e.setAttribute(k,v)}for(const k of kids)e.append(k);return e};
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const MISSION=(n,m)=>`Mission ${n} of ${m} tasks completed.`;
+
+/* ---------- theme ---------- */
+const root=document.documentElement;
+$("#theme").addEventListener("click",()=>{const dark=root.dataset.theme?root.dataset.theme==="dark":matchMedia("(prefers-color-scheme: dark)").matches;root.dataset.theme=dark?"light":"dark"});
+
+/* ---------- tabs ---------- */
+const TABS=[["palette","Commands"],["run","Simulated run"],["host","Host lanes"],["hold","Intervention"],["loop","Preview loop"],["retro","Retro + improve"],["scout","Scout"]];
+const nav=$("#tabs"),main=$("#main");
+const panels={};
+TABS.forEach(([id,label],i)=>{
+  const b=el("button",{role:"tab",id:"t-"+id,"aria-controls":"p-"+id,"aria-selected":i===0?"true":"false",tabindex:i===0?"0":"-1",onclick:()=>show(id)},label);
+  nav.append(b);
+  const p=el("section",{role:"tabpanel",id:"p-"+id,"aria-labelledby":"t-"+id,class:i===0?"on":""});
+  panels[id]=p;main.append(p);
+});
+function show(id){for(const[t]of TABS){const on=t===id;$("#t-"+t).setAttribute("aria-selected",on);$("#t-"+t).tabIndex=on?0:-1;panels[t].classList.toggle("on",on)}location.hash=id}
+nav.addEventListener("keydown",e=>{const ids=TABS.map(t=>t[0]);const cur=ids.findIndex(t=>$("#t-"+t).getAttribute("aria-selected")==="true");let n=null;if(e.key==="ArrowRight")n=(cur+1)%ids.length;if(e.key==="ArrowLeft")n=(cur-1+ids.length)%ids.length;if(n!==null){show(ids[n]);$("#t-"+ids[n]).focus();e.preventDefault()}});
+
+/* ---------- 1. command palette ---------- */
+const CMDS=[
+ ["blueprint","Plan a build by interview: decisions, spec, task graph, contract, preview.","skill blueprint (the skill is the command)","Grilling until every decision is settled, then the planner writes spec.md, plan.md, tasks/ and preview/index.html."],
+ ["build","Build an approved plan hands-free.","skill autopilot, args: build <plan>","Cleared for takeoff. Plan acme-invoices, 9 tasks, 3 lanes. Ledger: .autopilot/runs/2026-10-28-acme-invoices/ledger.md. You can leave the cockpit."],
+ ["status","Where the build stands: one status line and the mission log.","skill cockpit, verb status","autopilot 2026-10-28-acme-invoices: 3/9 tasks integrated, 2 in flight, wave 2 (review).\n\nMission 3 of 9 tasks completed.\n- Invoice totals computed in integer cents\n- Rounding rule pinned by 6 tests"],
+ ["intervention","Hold the current run: no new dispatches, and talk to me.","skill cockpit, verb intervention","Holding pattern over wave 2. Tasks 04 and 05 finish their current work; nothing new takes off. What do you need?"],
+ ["resume","Resume a paused or interrupted build from its ledger.","skill autopilot, args: resume <plan>","PAUSE cleared. Resuming course from the ledger at wave 2."],
+ ["preview","Open the plan's clickable preview and revise it until you give the green light.","skill cockpit, verb preview","Preview v2 published as a private Artifact. Click through, tell me what to change, or give the green light."],
+ ["merge","Merge finished lane and copilot branches into the integration branch.","agent runner (procedure in the command)","Merged autopilot-lane/acme-invoices/04, /05 and autopilot/acme-invoices-c1 into autopilot/acme-invoices. Gate: PASS. Nothing pushed."],
+ ["test","Run the plan's gate and report pass or fail.","agent runner","Gate `npm run check`: PASS (212 tests, 0 failures)."],
+ ["deploy","Run the plan's documented deploy command, if it names one.","agent runner, Contract row Deploy only","This plan names no deploy command."],
+ ["agent","Dispatch one of this plugin's agents with your brief.","the named plugin agent","/autopilot:agent reviewer audit tasks/04 for missing edge cases\n-> dispatched autopilot reviewer with your brief as its whole prompt."],
+ ["copilot","Show how a plan splits across copilots on this machine, and how each copilot is doing.","skill cockpit, verb copilot","lanes: 4 of 4 (cores 8.0, load 1.2, free 11.3 of 15.6 GB, reserve 1.6 GB, bound by plan)\ncopilots: 2 (host lanes 4, 2 lanes each) c1: 02,04,06,08 | c2: 03,05,07,09"],
+ ["scout","Scan for notable releases in this project's stack. Lists upgrades, installs nothing.","skill cockpit, verb scout -> scout agents (no shell)","3 scouts back. 4 notable releases listed below. Nothing was installed."],
+ ["improve","Review and apply a self-improvement patch the retro proposed.","skill cockpit, verb improve","1 proposal: docs/improvements/2026-10-28-acme-invoices.md (proposed, 1 file). Shall I show it?"],
+ ["recon","Reverse-engineer a system with a human in the loop.","skill recon (the skill is the command)","Recon session opened with the rea MCP server for this session only."],
+ ["verify","Verify a change against its spec.","skill verify (the skill is the command)","Verification report written; 0 blocking findings."],
+];
+(function(){
+  const p=panels.palette;
+  p.append(el("h1",{},"Type /autopilot: and see every command"),el("p",{class:"lead"},"Fifteen commands. Twelve are thin command files that route to a skill or agent; blueprint, recon and verify are skills that already own their names. Filter, then pick one to see where it routes and what it answers."));
+  const g=el("div",{class:"grid g3"});
+  const pal=el("div",{class:"palette"});
+  const inp=el("input",{type:"text","aria-label":"Filter commands",placeholder:"type to filter",autocomplete:"off",spellcheck:"false"});
+  pal.append(el("div",{class:"in"},el("span",{},"/autopilot:"),inp));
+  const ul=el("ul",{role:"listbox","aria-label":"Commands"});pal.append(ul);
+  const det=el("div",{class:"card detail","aria-live":"polite"});
+  g.append(pal,det);p.append(g);
+  let sel="status";
+  function draw(){
+    const q=inp.value.trim().toLowerCase();ul.textContent="";
+    const list=CMDS.filter(c=>!q||c[0].includes(q)||c[1].toLowerCase().includes(q));
+    if(!list.length)ul.append(el("li",{class:"muted",style:"padding:.6rem"},"No command matches."));
+    for(const c of list){const b=el("button",{"aria-current":c[0]===sel?"true":"false",onclick:()=>{sel=c[0];draw()}},el("span",{class:"n"},"/autopilot:"+c[0]),el("span",{class:"d"},c[1]));ul.append(el("li",{},b))}
+    const c=CMDS.find(x=>x[0]===sel)||CMDS[0];
+    det.innerHTML=`<div class="mono" style="color:var(--amber);font-size:16px">/autopilot:${esc(c[0])}</div><dl><dt>Purpose</dt><dd>${esc(c[1])}</dd><dt>Routes to</dt><dd class="mono">${esc(c[2])}</dd><dt>Sample answer</dt><dd><pre>${esc(c[3])}</pre></dd></dl>`;
+  }
+  inp.addEventListener("input",draw);draw();
+})();
+
+/* ---------- 2. simulated run ---------- */
+const PLAN_TASKS=[
+ ["01","Walking skeleton and gate",["Gate script runs lint, tests and build","CI green on the first push"]],
+ ["02","Invoice schema and migration",["invoices and line_items tables with integer cents","Migration reversible, tested both ways"]],
+ ["03","Totals engine",["Invoice totals computed in integer cents","Rounding rule pinned by 6 tests"]],
+ ["04","Invoice API",["POST and GET /invoices with validation","400 on a negative quantity"]],
+ ["05","PDF export",["One-page PDF per invoice","Fonts embedded, no network fetch"]],
+ ["06","Customer list screen",["Empty, loading and error states","Search by name, 20 per page"]],
+ ["07","Invoice editor screen",["Line items add and remove inline","Totals update as you type"]],
+ ["08","Email delivery",["Sends through the configured SMTP relay","Retries twice, then marks failed"]],
+ ["09","Dashboard",["Outstanding and overdue totals","Chart reads from the totals engine"]],
+];
+(function(){
+  const p=panels.run;
+  p.append(el("h1",{},"A run, as you see it"),el("p",{class:"lead"},"The captain speaks once per finished task: the pinned mission line and up to three bullets, read from the ledger, so no extra tokens are spent on prose. Agent briefs, commits, PR bodies and the ledger stay plain."));
+  const ctr=el("div",{class:"row"});
+  const step=el("button",{class:"primary"},"Next event");
+  const auto=el("button",{},"Play all");
+  const reset=el("button",{class:"ghost"},"Reset");
+  ctr.append(step,auto,reset);
+  const prog=el("div",{class:"prog",role:"progressbar","aria-label":"Missions completed","aria-valuemin":"0","aria-valuemax":"9","aria-valuenow":"0"},el("i"));
+  const status=el("div",{class:"mono muted",style:"margin:.5rem 0"});
+  const lanes=el("div",{class:"lanes","aria-label":"Lanes"});
+  const feed=el("div",{class:"feed","aria-live":"polite"});
+  const g=el("div",{class:"grid g3"});
+  const left=el("div",{class:"card"},el("h2",{style:"margin-top:0"},"Your session"),feed);
+  const right=el("div",{class:"card"},el("h2",{style:"margin-top:0"},"Cockpit"),prog,status,el("div",{class:"muted",style:"font-size:13px;margin-bottom:.3rem"},"Lanes this wave (host-load: 3 of 3)"),lanes);
+  g.append(left,right);p.append(ctr,el("div",{style:"height:.8rem"}),g);
+  const EVENTS=[
+    {k:"say",cls:"sys",line:"Cleared for takeoff.",body:"Plan acme-invoices: 9 tasks, 3 lanes. Ledger at .autopilot/runs/2026-10-28-acme-invoices/. You can leave the cockpit.",lanes:["01","",""]},
+    {k:"done",t:0,lanes:["02","03","04"]},
+    {k:"done",t:1,lanes:["","03","04"]},
+    {k:"done",t:2,lanes:["05","","04"]},
+    {k:"say",cls:"warn",line:"Turbulence on task 04.",body:"Its report cites src/api/invoice_routes.ts, which does not exist at its commit. Re-briefing with that citation as a finding. Logged: intervene: task 04 hallucination -> findings.",lanes:["05","","04"]},
+    {k:"done",t:3,lanes:["05","06","07"]},
+    {k:"done",t:4,lanes:["08","06","07"]},
+    {k:"say",cls:"sys",line:"Checkpoint after wave 3.",body:"A fresh conductor takes over from the ledger; nothing is lost.",lanes:["08","06","07"]},
+    {k:"done",t:5,lanes:["08","","07"]},
+    {k:"done",t:6,lanes:["08","09",""]},
+    {k:"done",t:7,lanes:["","09",""]},
+    {k:"done",t:8,lanes:["","",""]},
+    {k:"say",cls:"ok",line:"Touchdown.",body:"Pull request #12 is open and CI is green. Demands check: 11 of 12 met. Not done: R4, the reminder emails on a schedule (needs a cron host this plan does not name). One improvement proposal is waiting: /autopilot:improve.",lanes:["","",""]},
+  ];
+  let i=0,n=0,timer=null;
+  function setLanes(ls){lanes.textContent="";ls.forEach((t,ix)=>lanes.append(el("div",{class:"lane"+(t?" busy":"")},el("b",{},"lane "+(ix+1)),t?("task "+t):"idle")))}
+  function setStatus(){status.textContent=`autopilot 2026-10-28-acme-invoices: ${n}/9 tasks integrated${n<9?", wave "+(n<1?1:n<4?2:n<6?3:4):""}.`;prog.firstChild.style.width=(n/9*100)+"%";prog.setAttribute("aria-valuenow",n)}
+  function next(){
+    if(i>=EVENTS.length){stop();return}
+    const e=EVENTS[i++];
+    if(e.k==="done"){n++;const t=PLAN_TASKS[e.t];
+      const m=el("div",{class:"msg"},el("div",{class:"who"},"captain, after task "+t[0]),el("div",{class:"line"},MISSION(n,9)));
+      const ul=el("ul");t[2].forEach(b=>ul.append(el("li",{},b)));m.append(ul);feed.append(m);
+    }else{feed.append(el("div",{class:"msg "+e.cls},el("div",{class:"who"},"captain"),el("div",{class:"line"},e.line),el("div",{class:"muted"},e.body)))}
+    setLanes(e.lanes);setStatus();
+    feed.lastChild.scrollIntoView({block:"nearest",behavior:"smooth"});
+    step.disabled=i>=EVENTS.length;
+  }
+  function stop(){clearInterval(timer);timer=null;auto.textContent="Play all"}
+  step.onclick=next;
+  auto.onclick=()=>{if(timer){stop();return}auto.textContent="Pause";timer=setInterval(()=>{next();if(i>=EVENTS.length)stop()},900)};
+  reset.onclick=()=>{stop();i=0;n=0;feed.textContent="";step.disabled=false;setLanes(["","",""]);setStatus()};
+  setLanes(["","",""]);setStatus();
+})();
+
+/* ---------- 3. host lanes ---------- */
+(function(){
+  const p=panels.host;
+  p.append(el("h1",{},"Lanes sized to the machine"),el("p",{class:"lead"},"Before every wave the conductor asks host-load how many lanes this box can carry. On a VPS or in a container the cgroup limits are the real ceiling, and a memory reserve stays free so the machine never swaps or kills a process. Move the sliders."));
+  const g=el("div",{class:"grid g2"});
+  const c=el("div",{class:"card"});const r=el("div",{class:"card"});g.append(c,r);p.append(g);
+  const S={plan:3,cores:4,load:0.8,total:8,free:5.2,laneGb:1.5,cg:true,cgCpu:3,cgMem:4};
+  const ctl=(key,label,min,max,stepv,fmt=v=>v)=>{const o=el("output");const i=el("input",{type:"range",min,max,step:stepv,value:S[key],"aria-label":label});const w=el("div",{class:"ctl"},el("label",{},label),o,i);const up=()=>{o.textContent=fmt(S[key])};i.oninput=()=>{S[key]=Number(i.value);up();calc()};up();return w};
+  c.append(el("h2",{style:"margin-top:0"},"This machine (mocked)"),
+    ctl("plan","Plan Lanes",1,6,1),ctl("cores","OS cores",1,16,1),ctl("load","Load average",0,12,0.1,v=>v.toFixed(1)),
+    ctl("total","Total memory (GB)",2,64,1),ctl("free","OS free memory (GB)",0.5,64,0.1,v=>v.toFixed(1)),ctl("laneGb","Memory per lane (GB)",0.5,4,0.5,v=>v.toFixed(1)));
+  const cgBox=el("input",{type:"checkbox",id:"cg",checked:""});cgBox.checked=S.cg;cgBox.onchange=()=>{S.cg=cgBox.checked;calc()};
+  c.append(el("div",{class:"ctl"},el("label",{for:"cg"},"Running in a cgroup (VPS, container)"),cgBox),
+    ctl("cgCpu","cgroup cpu.max quota (cores)",0.5,16,0.5,v=>v.toFixed(1)),ctl("cgMem","cgroup memory.max minus current (GB)",0.5,64,0.5,v=>v.toFixed(1)));
+  const out=el("div",{class:"readout","aria-live":"polite"});const gauge=el("div",{class:"gauge"});const why=el("p",{class:"note"});const cop=el("pre");
+  r.append(el("h2",{style:"margin-top:0"},"host-load says"),out,gauge,why,el("h2",{},"and copilots"),el("p",{class:"muted",style:"margin:.2rem 0 .5rem;font-size:14px"},"Mock plan with three independent groups of 4, 3 and 3 tasks. Copilots = min(qualifying groups, host lanes); fewer than 2 means none. Lanes summed over copilots never exceed the host-load reading."),cop);
+  function calc(){
+    const cores=S.cg?Math.min(S.cores,S.cgCpu):S.cores;
+    const free=S.cg?Math.min(S.free,S.cgMem):S.free;
+    const reserve=Math.max(1,S.total*0.1);
+    const terms={plan:S.plan,cpu:Math.floor(cores-S.load),memory:Math.floor((free-reserve)/S.laneGb)};
+    const minv=Math.min(terms.plan,terms.cpu,terms.memory);
+    const bound=["plan","cpu","memory"].find(k=>terms[k]===minv);
+    const n=Math.max(1,minv);
+    out.textContent=`lanes: ${n} of ${S.plan} (cores ${cores.toFixed(1)}, load ${S.load.toFixed(1)}, free ${free.toFixed(1)} of ${S.total.toFixed(1)} GB, reserve ${reserve.toFixed(1)} GB, bound by ${bound})`;
+    gauge.innerHTML=["plan","cpu","memory"].map(k=>`<div class="${k===bound?"bind":""}"><small>by ${k}</small><strong>${terms[k]}</strong></div>`).join("");
+    why.textContent=minv<1?"Every limit is below one lane, so the wave runs one lane anyway: one lane is always progress.":bound==="plan"?"The machine has room to spare; the plan's own Lanes is the limit.":bound==="cpu"?"CPU is the limit: cores (after the cgroup quota) minus the load average.":"Memory is the limit: free memory (after the cgroup limit) minus the reserve, divided by memory per lane.";
+    const groups=[4,3,3];const K=Math.min(groups.length,n);
+    if(K<2){cop.textContent=`copilots: 0 (fewer than 2 independent groups of 3 or more tasks)`;}else{const each=Math.max(1,Math.floor(n/K));const crews=Array.from({length:K},()=>[]);const ids=[["02","04","06","08"],["03","05","07"],["09","10","11"]];ids.forEach(gp=>{crews.sort((a,b)=>a.length-b.length);crews[0].push(...gp)});crews.forEach(c=>c.sort());cop.textContent=`copilots: ${K} (host lanes ${n}, ${each} lanes each) `+crews.map((c,ix)=>`c${ix+1}: ${c.join(",")}`).join(" | ")+`\nlanes in use: ${K*each} of ${n}`;}
+  }
+  calc();
+})();
+
+/* ---------- 4. intervention ---------- */
+(function(){
+  const p=panels.hold;
+  p.append(el("h1",{},"Intervention: hold, talk, resume"),el("p",{class:"lead"},"You can hold the run at any time. The conductor also holds by itself when a task it already fixed trips again. A PAUSE file stops new crew dispatches at the next boundary; agents in flight finish their current task. Other agents still answer you."));
+  const steps=el("ol",{class:"steps","aria-label":"Flow"});
+  const NAMES=["running","hold requested","holding","instruction logged","resumed"];
+  const g=el("div",{class:"grid g3"});
+  const left=el("div",{class:"card"});const right=el("div",{class:"card"});g.append(left,right);
+  const feed=el("div",{class:"feed","aria-live":"polite"});
+  const btns=el("div",{class:"row",style:"margin-bottom:.8rem"});
+  const bHold=el("button",{class:"primary"},"/autopilot:intervention");
+  const bAuto=el("button",{},"Simulate: task 05 trips twice");
+  const bRes=el("button",{disabled:""},"/autopilot:resume");
+  btns.append(bHold,bAuto,bRes);
+  const say=el("div",{style:"margin:.6rem 0;display:none"});
+  const ti=el("input",{type:"text","aria-label":"Your instruction",value:"Use a 30-day due date, not 14."});
+  const tb=el("button",{},"Send instruction");
+  say.append(el("label",{class:"muted",style:"font-size:13px"},"Tell the captain"),ti,el("div",{style:"height:.4rem"}),tb);
+  left.append(btns,say,feed);
+  const flag=el("pre",{});const hook=el("pre",{});const ledger=el("pre",{});
+  right.append(el("h2",{style:"margin-top:0"},".autopilot/runs/2026-10-28-acme-invoices/PAUSE"),flag,el("h2",{},"Pause hook (PreToolUse on Agent|Task)"),hook,el("h2",{},"ledger.md (tail)"),ledger);
+  p.append(steps,g);
+  let st=0;let L=["task 04: integrated @ 9f3c2a1","summary 04: POST and GET /invoices with validation | 400 on a negative quantity","task 05: dispatched (wave 3, start 9f3c2a1)","task 06: dispatched (wave 3, start 9f3c2a1)"];
+  function draw(){steps.textContent="";NAMES.forEach((n,i)=>steps.append(el("li",{class:i<st?"done":i===st?"now":""},n)));ledger.textContent=L.slice(-6).join("\n")}
+  function msg(cls,line,body){feed.append(el("div",{class:"msg "+cls},el("div",{class:"who"},"captain"),el("div",{class:"line"},line),el("div",{class:"muted"},body)))}
+  function holdWith(reason,line,body){flag.textContent=reason;hook.textContent="dispatch autopilot coder (task 07) -> blocked, exit 2\nautopilot: the run 2026-10-28-acme-invoices is paused ("+reason+"). Do not dispatch build agents.\n\ndispatch Explore (answer the user) -> allowed";L.push("paused: "+reason);msg("warn",line,body);bHold.disabled=true;bAuto.disabled=true;bRes.disabled=false;say.style.display="block";st=2;draw()}
+  bHold.onclick=()=>{st=1;draw();holdWith("manual intervention","Holding pattern over wave 3.","Tasks 05 and 06 finish what they are doing; nothing new takes off. Status: 4/9 tasks integrated, 2 in flight. What do you need?")};
+  bAuto.onclick=()=>{L.push("intervene: task 05 stall -> reset");L.push("task 05: dispatched (wave 3, start 9f3c2a1)");draw();setTimeout(()=>{st=1;draw();holdWith("task 05: stall again after an intervention","Holding pattern: task 05 stalled twice.","I re-briefed it once after 92 minutes without a report; the retry stalled too. I will not burn more fuel on it without you. Split it, drop it, or tell me what it needs.")},500)};
+  tb.onclick=()=>{const v=ti.value.replace(/[\u0000-\u001f]/g," ").trim().slice(0,200);if(!v)return;L.push("user: "+v);msg("sys","Logged for the crew.","The resumed conductor follows: \""+v+"\"");st=3;draw()};
+  bRes.onclick=()=>{flag.textContent="(no file: cleared by /autopilot:resume)";hook.textContent="dispatch autopilot coder (task 07) -> allowed";L.push("checkpoint: resumed from the ledger");msg("ok","Resuming course.","PAUSE cleared. A fresh conductor picks up at wave 3 from the ledger.");bRes.disabled=true;bHold.disabled=false;bAuto.disabled=false;say.style.display="none";st=4;draw()};
+  flag.textContent="(no file: the run is flying)";hook.textContent="dispatch autopilot coder (task 05) -> allowed";draw();
+})();
+
+/* ---------- 5. preview loop ---------- */
+(function(){
+  const p=panels.loop;
+  p.append(el("h1",{},"The preview loop, before any build"),el("p",{class:"lead"},"After the plan and its audit, the planner's clickthrough is published as a private Artifact. You click, ask for changes, see them applied, and loop until you give the green light. Without an Artifact tool you get the file path instead. The build never starts before the green light."));
+  const steps=el("ol",{class:"steps"});
+  const S=["plan drafted","audit clean","preview v1 published","changes requested","preview revised","green light","build cleared"];
+  const g=el("div",{class:"grid g2"});
+  const mock=el("div",{class:"mock"});
+  const ctl=el("div",{class:"card"});
+  g.append(ctl,mock);p.append(steps,g);
+  let v=1,st=2;let accent="var(--blue)",label="Create invoice",due="Due in 14 days";
+  const ta=el("textarea",{rows:"3","aria-label":"Your change"});ta.value="Make the main button amber and say 'New invoice'. Due date should be 30 days.";
+  const bReq=el("button",{},"Request change");const bGo=el("button",{class:"primary"},"Green light");
+  const art=el("div",{class:"row",style:"margin:.5rem 0"});
+  const hasArt=el("input",{type:"checkbox",id:"art",checked:""});hasArt.checked=true;
+  const where=el("pre");
+  const log=el("div",{class:"feed",style:"margin-top:.7rem"});
+  ctl.append(el("h2",{style:"margin-top:0"},"You"),art,where,el("div",{style:"height:.5rem"}),el("label",{class:"muted",style:"font-size:13px"},"What should change?"),ta,el("div",{class:"row",style:"margin-top:.5rem"},bReq,bGo),log);
+  art.append(hasArt,el("label",{for:"art"},"This session has an Artifact tool"));
+  function draw(){
+    steps.textContent="";S.forEach((s,i)=>steps.append(el("li",{class:i<st?"done":i===st?"now":""},s)));
+    where.textContent=hasArt.checked?`Preview v${v} published as a private Artifact.\nLink: (artifact link)`:`No Artifact tool here. Open this file:\n/home/you/acme/docs/plans/2026-10-28-acme-invoices/preview/index.html`;
+    mock.innerHTML=`<div class="muted mono" style="font-size:12px;margin-bottom:.5rem">preview/index.html, v${v} (mocked app)</div><div class="phone"><div style="font-weight:600">Invoices</div><div class="muted" style="font-size:13px">ACME Ltd, 3 drafts</div><div style="margin-top:.5rem;font-size:14px">INV-0042 &middot; 1,250.00<br><span class="muted">${due}</span></div><div class="btnm" style="background:${accent}">${label}</div></div>`;
+  }
+  hasArt.onchange=draw;
+  bReq.onclick=()=>{if(st>=5)return;const t=ta.value.trim();if(!t)return;st=3;draw();log.append(el("div",{class:"msg"},el("div",{class:"who"},"you"),el("div",{},t)));
+    setTimeout(()=>{v++;if(/amber/i.test(t))accent="var(--amber)";const m=t.match(/'([^']+)'/);if(m)label=m[1];const d=t.match(/(\d+)\s*days?/i);if(d)due="Due in "+d[1]+" days";st=4;draw();log.append(el("div",{class:"msg sys"},el("div",{class:"who"},"captain"),el("div",{},`Planner revised the plan and the preview. v${v} republished. Anything else, or green light?`)))},600)};
+  bGo.onclick=()=>{st=6;draw();bReq.disabled=true;bGo.disabled=true;log.append(el("div",{class:"msg ok"},el("div",{class:"who"},"captain"),el("div",{class:"line"},"Green light received."),el("div",{class:"muted"},`Preview approved ${new Date().toISOString().slice(0,10)} is written under the plan's Status line. Cleared for takeoff on your word: /autopilot:build.`)))};
+  draw();
+})();
+
+/* ---------- 6. retro + improve ---------- */
+(function(){
+  const p=panels.retro;
+  p.append(el("h1",{},"Retro and /autopilot:improve"),el("p",{class:"lead"},"At Finish the retro looks for problems that repeated: a lesson seen twice, a task intervened twice, a senior escalation, a parked task. It writes a proposal; a senior agent drafts the patch. Nothing touches the plugin until you read it and say yes."));
+  const g=el("div",{class:"grid g2"});
+  const doc=el("div",{class:"card"});const flow=el("div",{class:"card"});g.append(doc,flow);p.append(g);
+  doc.append(el("div",{class:"row"},el("span",{class:"mono",style:"font-size:13px"},"docs/improvements/2026-10-28-acme-invoices.md"),el("span",{class:"tag amber",id:"rstat"},"proposed")));
+  const body=el("pre",{class:"diff",style:"margin-top:.6rem"});
+  body.innerHTML=[
+   "# Improvement: acme-invoices","Status: <span id=\"rs2\">proposed</span>","","## Problem",
+   "- lesson: seen in 2 projects: vitest watch mode hangs the gate",
+   "- intervened: task 05 stalled twice (PDF export)","","## Evidence",
+   "- `intervene: task 05 stall -> reset`","- `paused: task 05: stall again after an intervention`",
+   "- `lesson (count 2): vitest without --run never exits -> pass --run in Gate`","","## Patch",
+   "<span class=\"hd\">--- a/skills/blueprint/PLAN-FORMAT.md</span>","<span class=\"hd\">+++ b/skills/blueprint/PLAN-FORMAT.md</span>",
+   "@@ -101 +101 @@","<span class=\"del\">-| Gate | &lt;the full required gate...&gt; |</span>",
+   "<span class=\"add\">+| Gate | &lt;the full required gate; test runners in run-once mode (vitest --run)&gt; |</span>",
+   "<span class=\"hd\">--- a/hooks/hooks.json</span>","<span class=\"hd\">+++ b/hooks/hooks.json</span>","@@ (one timeout raised from 10 to 15) @@"
+  ].join("\n");
+  doc.append(body);
+  const feed=el("div",{class:"feed","aria-live":"polite"});
+  const b1=el("button",{class:"primary"},"/autopilot:improve");
+  const yes=el("button",{disabled:""},"Yes, apply it");const no=el("button",{class:"ghost",disabled:""},"Not now");
+  flow.append(el("h2",{style:"margin-top:0"},"Your session"),el("div",{class:"row"},b1,yes,no),el("div",{style:"height:.6rem"}),feed);
+  const say=(cls,who,html)=>feed.append(el("div",{class:"msg "+cls},el("div",{class:"who"},who),el("div",{html})));
+  b1.onclick=()=>{b1.disabled=true;say("sys","captain","One proposal: <code>2026-10-28-acme-invoices.md</code>.");
+    say("","improve.mjs check","<span class='mono'>ok: 2 files would change: skills/blueprint/PLAN-FORMAT.md, hooks/hooks.json</span>");
+    feed.append(el("div",{class:"flag",html:"<strong style='color:var(--red)'>hooks/</strong><span>hooks/hooks.json changes code that runs on your machine on every tool call. Read that hunk before you say yes.</span>"}));
+    say("","captain","Problem: task 05 stalled twice, and a vitest lesson repeated in two projects. Apply this patch to your plugin checkout? Only your own yes counts.");yes.disabled=false;no.disabled=false};
+  yes.onclick=()=>{yes.disabled=true;no.disabled=true;say("ok","improve.mjs apply --yes","<span class='mono'>applied: 2 files</span>");say("ok","captain","Patch applied; the proposal now says Status: applied. Run <code>npm run check</code> in the plugin checkout before you commit it.");$("#rstat").textContent="applied";$("#rstat").className="tag green";$("#rs2").textContent="applied"};
+  no.onclick=()=>{yes.disabled=true;no.disabled=true;say("sys","captain","Left as proposed. Nothing changed.");b1.disabled=false};
+})();
+
+/* ---------- 7. scout ---------- */
+(function(){
+  const p=panels.scout;
+  p.append(el("h1",{},"/autopilot:scout, on demand"),el("p",{class:"lead"},"Scouts are research agents with no shell: they read upstream release notes and copy the install command from the upstream docs. You get a list. Nothing is installed, now or on a schedule."));
+  const card=el("div",{class:"card"});p.append(card);
+  const go=el("button",{class:"primary"},"Run /autopilot:scout");
+  const st=el("div",{class:"mono muted",style:"margin:.6rem 0","aria-live":"polite"},"Stack detected from lessons.mjs sync: nextjs, prisma, vitest");
+  const wrap=el("div",{class:"tablewrap"});
+  card.append(el("div",{class:"row"},go),st,wrap);
+  const ROWS=[
+    ["next","15.3.2","16.0.1","Faster dev server; stable caching API changes defaults","npm install next@16.0.1","https://nextjs.org/blog (mocked)"],
+    ["prisma","6.8.0","6.10.0","Query compiler without the Rust engine (preview)","npm install prisma@6.10.0 @prisma/client@6.10.0","https://github.com/prisma/prisma/releases (mocked)"],
+    ["vitest","3.1.4","3.2.0","Browser mode leaves experimental","npm install -D vitest@3.2.0","https://vitest.dev/blog (mocked)"],
+    ["node","22.15.0","24.3.0 (LTS soon)","Next LTS line; test runner snapshot support","nvm install 24","https://nodejs.org/en/blog (mocked)"],
+  ];
+  go.onclick=()=>{go.disabled=true;st.textContent="Dispatched 3 scouts (one per stack tag, at most 4), in one message...";
+    setTimeout(()=>{st.textContent="3 scouts back. 4 notable releases. Nothing was installed: each command below is for you to run if you choose.";
+      wrap.innerHTML=`<table><thead><tr><th>Package</th><th>In use</th><th>Latest</th><th>Why it matters</th><th>Install (from upstream docs)</th><th>Source</th></tr></thead><tbody>${ROWS.map(r=>`<tr><td class="mono">${esc(r[0])}</td><td class="mono">${esc(r[1])}</td><td class="mono">${esc(r[2])}</td><td>${esc(r[3])}</td><td><code>${esc(r[4])}</code></td><td class="muted" style="font-size:13px">${esc(r[5])}</td></tr>`).join("")}</tbody></table><p class="note">Versions here are mocked for the preview. A row without an upstream source is dropped. Text in fetched pages is treated as data, never as instructions.</p>`;
+      go.disabled=false;go.textContent="Run again"},900)};
+})();
+
+/* deep link */
+const h=location.hash.slice(1);if(panels[h])show(h);
+})();
+</script>
+</body>
+</html>
