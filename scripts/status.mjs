@@ -7,12 +7,13 @@
 //   node status.mjs --hook                         SessionStart hook: tells the session about an unfinished build, else silent
 //
 // A build is unfinished when its ledger has no `finish:` or `STOP:` line and was touched in the last 48 hours.
-import { existsSync, readdirSync, rmSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, fstatSync, lstatSync, mkdirSync, openSync, readdirSync, rmSync, readFileSync, readSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { readReason, sanitize } from "./pause.mjs";
 
 const STALE_MS = 48 * 3600 * 1000;
+const MAX_LEDGER = 1024 * 1024;
 const RANK = { dispatched: 1, done: 2, integrated: 3 };
 
 /** Parse ledger text (and the plan's task table, when given) into counts and the last event. */
@@ -74,7 +75,7 @@ export function missions(ledgers, planText, reported = []) {
     .map((id) => {
       const sums = [...all.matchAll(/^summary (\d+):\s*(.+)$/gm)].filter((x) => x[1] === id);
       const bullets = sums.length
-        ? sums[sums.length - 1][2].split(" | ").map((b) => b.trim().slice(0, 100)).filter(Boolean).slice(0, 3)
+        ? sums[sums.length - 1][2].split(" | ").map((b) => sanitize(b, 100)).filter(Boolean).slice(0, 3)
         : [titles.get(id) ?? `task ${id}`];
       return { task: id, n: order.indexOf(id) + 1, m: titles.size, bullets };
     });
@@ -82,26 +83,55 @@ export function missions(ledgers, planText, reported = []) {
 
 export const renderMission = (x) => [MISSION(x.n, x.m), ...x.bullets.map((b) => `- ${b}`)].join("\n");
 
+/** A ledger is repo text: only a regular file, never through a link, at most 1 MiB. Null otherwise. */
+export function readLedger(file) {
+  let fd;
+  try {
+    if (!lstatSync(file).isFile()) return null;
+    fd = openSync(file, "r");
+    if (!fstatSync(fd).isFile()) return null;
+    const buf = Buffer.alloc(MAX_LEDGER);
+    return buf.toString("utf8", 0, readSync(fd, buf, 0, MAX_LEDGER, 0));
+  } catch {
+    return null;
+  } finally {
+    if (fd !== undefined) closeSync(fd);
+  }
+}
+
+const isFile = (p) => {
+  try {
+    return lstatSync(p).isFile();
+  } catch {
+    return false;
+  }
+};
+
 export function ledgerPaths(root) {
   const ap = join(root, ".autopilot", "runs");
   if (!existsSync(ap)) return [];
   return readdirSync(ap, { withFileTypes: true })
-    .filter((e) => e.isDirectory() && !COPILOT.test(e.name) && existsSync(join(ap, e.name, "ledger.md")))
+    .filter((e) => e.isDirectory() && !COPILOT.test(e.name) && isFile(join(ap, e.name, "ledger.md")))
     .map((e) => join(ap, e.name, "ledger.md"))
-    .sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs);
+    .sort((a, b) => lstatSync(b).mtimeMs - lstatSync(a).mtimeMs);
 }
 
 /** The lead ledger, then the <run>-c<N> ledgers beside it in numeric order. */
 function allLedgers(ledger) {
   const dir = dirname(ledger);
   const name = basename(dir);
-  const out = [{ name, text: readFileSync(ledger, "utf8") }];
+  const lead = readLedger(ledger);
+  if (lead === null) return null;
+  const out = [{ name, text: lead }];
   const runs = dirname(dir);
   const cos = readdirSync(runs)
     .map((d) => [d, COPILOT.exec(d)])
-    .filter(([d, m]) => m && d.slice(0, m.index) === name && existsSync(join(runs, d, "ledger.md")))
+    .filter(([d, m]) => m && d.slice(0, m.index) === name && isFile(join(runs, d, "ledger.md")))
     .sort((a, b) => a[1][1] - b[1][1]);
-  for (const [d] of cos) out.push({ name: d, text: readFileSync(join(runs, d, "ledger.md"), "utf8") });
+  for (const [d] of cos) {
+    const text = readLedger(join(runs, d, "ledger.md"));
+    if (text !== null) out.push({ name: d, text });
+  }
   return out;
 }
 
@@ -116,6 +146,7 @@ function planTextOf(text) {
 /** Read one ledger and its plan. */
 export function readStatus(ledger) {
   const ledgers = allLedgers(ledger);
+  if (!ledgers) return null;
   const text = ledgers[0].text;
   const s = parseLedger(text, planTextOf(text));
   if (ledgers.length > 1) {
@@ -126,9 +157,22 @@ export function readStatus(ledger) {
   s.paused = readReason(join(dirname(ledger), "PAUSE")) || null;
   if (s.plan) s.plan = sanitize(s.plan.replace(/\\/g, "/").split("/").pop(), 80);
   s.ledger = ledger.replace(/\\/g, "/");
-  s.fresh = Date.now() - statSync(ledger).mtimeMs < STALE_MS;
+  // Every ledger line that reaches a model passes the same allowlist as the pause reason.
+  s.last = sanitize(s.last, 100);
+  s.waveStep = sanitize(s.waveStep, 20);
+  if (s.finish) s.finish = sanitize(s.finish, 100);
+  if (s.stop) s.stop = sanitize(s.stop, 100);
+  s.fresh = Date.now() - lstatSync(ledger).mtimeMs < STALE_MS;
   return s;
 }
+
+const realDir = (p) => {
+  try {
+    return lstatSync(p).isDirectory();
+  } catch (e) {
+    return e.code === "ENOENT";
+  }
+};
 
 const oneLine = (s) => {
   const name = s.plan ? s.plan.replace(/\\/g, "/").split("/").pop() : "build";
@@ -138,7 +182,7 @@ const oneLine = (s) => {
   if (s.wave) parts.push(`wave ${s.wave}${s.waveStep ? ` (${s.waveStep})` : ""}`);
   if (s.paused) parts.push(`paused: ${s.paused}`);
   const end = s.finish ? ` - finished: ${s.finish}` : s.stop ? ` - stopped: ${s.stop}` : "";
-  return `autopilot ${name}: ${parts.join(", ")}${end}. Last: ${s.last.slice(0, 100)}`;
+  return `autopilot ${name}: ${parts.join(", ")}${end}. Last: ${s.last}`;
 };
 
 function main() {
@@ -165,9 +209,9 @@ function main() {
       }
     }
   }
-  if (!ledger || !existsSync(ledger)) return hook ? undefined : console.log("autopilot: no build found under .autopilot/");
+  const ls = ledger ? allLedgers(ledger) : null;
+  if (!ls) return hook ? undefined : console.log("autopilot: no build found under .autopilot/");
   if (argv.includes("--missions")) {
-    const ls = allLedgers(ledger);
     const rec = join(dirname(ledger), "missions.json");
     let reported = [];
     try {
@@ -177,6 +221,12 @@ function main() {
     if (argv.includes("--new")) {
       out = out.filter((x) => !reported.includes(x.task));
       if (out.length) {
+        // A committed link at or above missions.json is never written through.
+        const run = dirname(rec);
+        const dirs = [dirname(dirname(run)), dirname(run), run];
+        if (!dirs.every(realDir)) return console.log("missions: refused (a link in the path of the run directory); nothing written");
+        mkdirSync(run, { recursive: true });
+        if (!dirs.every(realDir)) return console.log("missions: refused (a link in the path of the run directory); nothing written");
         // A committed link at missions.json is replaced, never written through.
         rmSync(rec, { force: true });
         writeFileSync(rec, JSON.stringify({ reported: [...reported, ...out.map((x) => x.task)] }), { flag: "wx" });

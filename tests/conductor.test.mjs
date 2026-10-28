@@ -41,8 +41,8 @@ test("summary line parses", () => {
   const ledgers = [{ text: `task 01: integrated @ abc1234\n${line}` }];
   const [m] = missions(ledgers, "| 01 | title | coder |\n");
   assert.equal(m.bullets.length, 3);
-  assert.ok(m.bullets.every((b) => !/[<>]/.test(b) || /^<b\d>$/.test(b)));
-  assert.deepEqual(m.bullets, ["<b1>", "<b2>", "<b3>"]);
+  // The allowlist drops the angle brackets of the template.
+  assert.deepEqual(m.bullets, ["b1", "b2", "b3"]);
 });
 
 test("intervene line parses", () => {
@@ -59,7 +59,7 @@ test("detectors wired", () => {
   const scripts = section("The scripts");
   assert.match(scripts, /node "<scripts>\/detect\.mjs" start RUN <NN>/);
   assert.match(scripts, /node "<scripts>\/detect\.mjs" check RUN <NN> --report <report file> --task <task file>/);
-  assert.match(scripts, /node "<scripts>\/pause\.mjs" set <PLAN directory name> "<reason>"/);
+  assert.match(scripts, /node "<scripts>\/pause\.mjs" set "<PLAN directory name>" '<reason>'/);
   assert.match(scripts, /node "<scripts>\/retro\.mjs" RUN/);
   const run = section("2. Run the frontier");
   assert.match(step(run, 2), /detect\.mjs" start/);

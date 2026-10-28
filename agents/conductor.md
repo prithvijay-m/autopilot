@@ -39,7 +39,7 @@ All live in `${CLAUDE_PLUGIN_ROOT}/scripts/`, run from the repository root, cost
 - **Status**: `node "<scripts>/status.mjs"` prints one line from the ledger: tasks integrated, in flight, parked, the wave. Use it to orient after a resume.
 - **Leftover scan**: `node "<scripts>/scan-diff.mjs" <BASE>`. Every line it prints is a finding at the severity it names: secrets, env files, conflict markers, focused tests, debugger statements, debug logs, TODO markers.
 - **Detect**: `node "<scripts>/detect.mjs" start RUN <NN>` before each task's dispatch records the time, and `node "<scripts>/detect.mjs" check RUN <NN> --report <report file> --task <task file>` after each report prints one line per tripped signal (`reset`, `split`, `findings`, `senior`, `context`), `clear task NN`, or a `PAUSE` line.
-- **Pause**: `node "<scripts>/pause.mjs" set <PLAN directory name> "<reason>"` stops further dispatches until the user resumes.
+- **Pause**: `node "<scripts>/pause.mjs" set "<PLAN directory name>" '<reason>'` stops further dispatches until the user resumes. The reason is one of the fixed strings in step 3 of Run the frontier.
 - **Retro**: `node "<scripts>/retro.mjs" RUN` reads the ledger and lessons, writes an improvement proposal when the same problem repeated, and prints its path (or says there is none).
 - **Lessons**: `node "<scripts>/lessons.mjs" sync` writes LESSONS, the lessons that apply to this repository, and prints the repository's stack tags. `node "<scripts>/lessons.mjs" add --scope <scope> "<what happened -> what to do instead>"` records one, and `node "<scripts>/lessons.mjs" drop "<text fragment>"` removes one this run proved wrong.
 
