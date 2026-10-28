@@ -304,3 +304,23 @@ test("verification failure after a successful apply is reported as applied but n
   assert.equal(readFileSync(join(r.dir, "scripts", "a.mjs"), "utf8"), "uno\ntwo\n");
   assert.match(readFileSync(f, "utf8"), /^Status: proposed$/m);
 });
+
+test("rename old/new spelling refused for a source outside the plugin's folders", () => {
+  const r = plugin();
+  const f = put(r, "p.md", prop("diff --git a/.claude-plugin/plugin.json b/docs/p.json\nsimilarity index 100%\nrename old .claude-plugin/plugin.json\nrename new docs/p.json\n"));
+  const o = run(r, ["apply", f, "--yes"]);
+  assert.equal(o.status, 1, o.out);
+  assert.match(o.out, /^refused: path outside the plugin's own folders \.claude-plugin\/plugin\.json/);
+  assert.equal(existsSync(join(r.dir, ".claude-plugin", "plugin.json")), true);
+  assert.equal(existsSync(join(r.dir, "docs", "p.json")), false);
+});
+
+test("copy sections refused before any write (git cannot verify them in reverse)", () => {
+  const r = plugin({ "hooks/a.sh": "echo hi\n" });
+  const f = put(r, "p.md", prop("diff --git a/hooks/a.sh b/hooks/d.sh\nsimilarity index 100%\ncopy from hooks/a.sh\ncopy to hooks/d.sh\n"));
+  const o = run(r, ["apply", f, "--yes"]);
+  assert.equal(o.status, 1, o.out);
+  assert.equal(o.out, "refused: copy patches are not accepted");
+  assert.equal(existsSync(join(r.dir, "hooks", "d.sh")), false);
+  assert.match(readFileSync(f, "utf8"), /^Status: proposed$/m);
+});

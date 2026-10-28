@@ -28,6 +28,9 @@ export function extractPatch(md) {
 
 const clean = (s) => s.split("\t")[0];
 
+// Every spelling git accepts for the two sides of a rename or copy.
+const MOVE = /^(?:rename|copy) (from|to|old|new) (.*)$/;
+
 /** Every path named by the ---, +++, rename and copy lines (a/ and b/ stripped), without /dev/null. */
 export function patchPaths(diff) {
   const out = [];
@@ -37,7 +40,18 @@ export function patchPaths(diff) {
     if ((m = /^(?:---|\+\+\+) (.*)$/.exec(line))) {
       const p = clean(m[1]);
       add(/^[ab]\//.test(p) ? p.slice(2) : p);
-    } else if ((m = /^(?:rename|copy) (?:from|to) (.*)$/.exec(line))) add(clean(m[1]));
+    } else if ((m = MOVE.exec(line))) add(clean(m[2]));
+    else if ((m = /^diff --git a\/(.*) b\/(.*)$/.exec(line)) && !m[1].includes(" b/")) add(m[1]), add(m[2]);
+  }
+  return out;
+}
+
+/** The source path of every rename or copy section, in order. git's numstat does not list them. */
+function movedFrom(diff) {
+  const out = [];
+  for (const line of String(diff).split("\n")) {
+    const m = MOVE.exec(line);
+    if (m && (m[1] === "from" || m[1] === "old")) out.push(clean(m[2]));
   }
   return out;
 }
@@ -82,6 +96,7 @@ const SAFE_MODES = new Set([0o100644, 0o100755]);
 /** First reason the patch text must not be applied, or null. Path checks on git's own list follow. */
 function patchReason(diff) {
   if (/^GIT binary patch/m.test(diff) || /^Binary files /m.test(diff)) return "binary patches are not accepted";
+  if (/^copy (?:from|to) /m.test(diff)) return "copy patches are not accepted";
   for (const line of diff.split("\n")) {
     let m;
     if ((m = /^(?:old|new|deleted file|new file) mode\s+(\S*)/.exec(line)) || (m = /^index \S+\s+(\S+)\s*$/.exec(line))) {
@@ -90,7 +105,7 @@ function patchReason(diff) {
       return `diff header not in the plain a/<path> b/<path> form ${line.slice(0, 80)}`;
     } else if ((m = /^(---|\+\+\+) (.*)$/.exec(line))) {
       const p = clean(m[2]);
-      if (p !== "/dev/null" && !p.startsWith(m[1] === "---" ? "a/" : "b/")) return `path outside the plugin's own folders ${p}`;
+      if (p !== "/dev/null" && !p.startsWith(m[1] === "---" ? "a/" : "b/")) return "patch paths must use the a/ and b/ prefixes";
     }
   }
   for (const p of patchPaths(diff)) {
@@ -100,7 +115,12 @@ function patchReason(diff) {
   return null;
 }
 
-/** Files git itself says the patch touches (both sides of renames and copies). */
+/**
+ * Files the patch touches: git's own numstat list (one entry per section, the new name of a
+ * rename or copy) plus the source of every rename or copy. A path named by more than one
+ * section is refused: git applies such a patch forward, but the result cannot be checked in
+ * reverse, so it is never applied.
+ */
 function gitPaths(root, diff) {
   const g = git(root, ["apply", "--numstat", "-z", "-p1"], diff);
   if (g.error || g.status !== 0) return { failed: firstLine(g) };
@@ -109,10 +129,13 @@ function gitPaths(root, diff) {
   for (let i = 0; i < parts.length; i++) {
     const m = /^(?:\d+|-)\t(?:\d+|-)\t([\s\S]*)$/.exec(parts[i]);
     if (!m) continue;
-    if (m[1] === "") out.push(parts[++i], parts[++i]);
+    if (m[1] === "") out.push(parts[(i += 2)]); // two-name form: keep the new name, movedFrom adds the source
     else out.push(m[1]);
   }
-  return { paths: [...new Set(out.filter((p) => p))] };
+  const named = [...out.filter((p) => p), ...movedFrom(diff)];
+  const twice = named.find((p, i) => named.indexOf(p) !== i);
+  if (twice) return { refused: `path named in more than one section ${twice}` };
+  return { paths: named };
 }
 
 const firstLine = (g) => ((g.stderr || g.stdout || String(g.error || "")).split(/\r?\n/).find((l) => l.trim()) ?? "git apply failed").trim();
@@ -164,6 +187,7 @@ function inspect(file, rootArg) {
   const outer = spawnSync("git", ["rev-parse", "--show-prefix"], { cwd: root, encoding: "utf8", env: cleanEnv() });
   if (outer.status === 0 && outer.stdout.trim() !== "") return { refused: `root is not the top of its git work tree ${root}` };
   const listed = gitPaths(root, diff);
+  if (listed.refused) return { refused: listed.refused };
   if (listed.failed) return { failed: listed.failed };
   const { paths } = listed;
   if (!paths.length) return { refused: `no files in the patch ${file}` };
@@ -202,7 +226,11 @@ function list(dir) {
   return lines.length ? lines.join("\n") : "improve: no proposals";
 }
 
-function main(argv) {
+/** True when the working tree shows the change: the patch applies in reverse. */
+const reverses = (root, diff) => git(root, ["apply", "--check", "-R", "-p1"], diff).status === 0;
+
+/** Run one command; returns the exit code. `verify` is replaceable so tests can reach its failure branch. */
+export function main(argv, { verify = reverses } = {}) {
   const [cmd, ...rest] = argv;
   const flag = (name) => {
     const i = rest.indexOf(name);
@@ -229,8 +257,8 @@ function main(argv) {
   if (!rest.includes("--yes")) return (console.log(`ok: ${summary}\npass --yes to apply`), 0);
   const g = git(r.root, ["apply", "-p1"], r.diff);
   if (g.error || g.status !== 0) return (console.log(`does not apply: ${(g.stderr || "git apply failed").split(/\r?\n/)[0]}`), 1);
-  const back = git(r.root, ["apply", "--check", "-R", "-p1"], r.diff);
-  if (back.status !== 0) return (console.log("does not apply: the working tree does not show the change"), 1);
+  // git apply returned 0, so files were written: never report "does not apply" from here on.
+  if (!verify(r.root, r.diff)) return (console.log(`applied but not verified: ${r.paths.join(", ")} changed; review with git diff`), 1);
   const abs = resolve(file);
   writeFileSync(abs, readFileSync(abs, "utf8").replace(/^Status: proposed[ \t]*$/m, "Status: applied"));
   console.log(`applied: ${r.paths.length} files`);
