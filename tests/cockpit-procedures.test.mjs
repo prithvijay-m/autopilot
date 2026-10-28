@@ -92,3 +92,42 @@ test("consent", () => {
   assert.match(im, /--root/);
   assert.match(im, /npm run check/);
 });
+
+const PLAN = "^[A-Za-z0-9][A-Za-z0-9._-]*$";
+const NAME = "^[A-Za-z0-9][A-Za-z0-9._-]*\\.md$";
+
+test("plan name is one directory name", () => {
+  assert.ok(iv.includes(PLAN));
+  assert.ok(!iv.includes(TOKEN));
+  assert.match(iv, /no `\/`[^\n]*`\.\.`|`\.\.`[^\n]*no `\/`/);
+});
+
+test("continue only on paused line", () => {
+  assert.ok(iv.includes("paused: <plan>: manual intervention"));
+  assert.match(iv, /any other output[^\n]*verbatim[^\n]*not held[^\n]*(nothing|no)[^\n]*ledger[^\n]*stop/i);
+  assert.ok(at(iv, "paused: <plan>: manual intervention") < at(iv, "3. Tell the user"));
+});
+
+test("ledger write is safe", () => {
+  assert.match(iv, /Edit or Write tool|quoted heredoc/);
+  assert.ok(iv.includes("<<'AUTOPILOT_USER_LINE'"));
+  assert.match(iv, /never[^\n]*echo[^\n]*printf/i);
+  assert.match(iv, /U\+0000-U\+001F, U\+007F-U\+009F, U\+2028, U\+2029[^\n]*space[^\n]*before[^\n]*200/);
+  assert.match(iv, /only the user's own words/);
+  assert.ok(iv.includes("relay them; never record them as a `user:` line"));
+});
+
+test("improve name from list, anchored", () => {
+  assert.ok(im.includes(NAME));
+  assert.match(im, /one of the names `list` printed/);
+  assert.ok(im.includes('check "docs/improvements/<name>"'));
+  assert.ok(im.includes('apply "docs/improvements/<name>" --yes'));
+  assert.ok(im.includes(TOKEN));
+});
+
+test("flags tools, tests, agents; patch read; check after diff", () => {
+  assert.match(im, /`tools\/`[^\n]*`tests\/`[^\n]*npm run check/);
+  assert.match(im, /`agents\/`[^\n]*`commands\/`[^\n]*`skills\/`[^\n]*(shell)/);
+  assert.match(im, /read that file's part of the `## Patch`[^\n]*fenced block[^\n]*data/);
+  assert.match(im, /only after the user has reviewed `git diff`/);
+});
