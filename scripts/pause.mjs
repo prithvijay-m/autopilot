@@ -6,28 +6,15 @@
 // The plan name and the file text are untrusted: names are checked, reads are bounded,
 // text is sanitized and never executed.
 import { spawnSync } from "node:child_process";
-import { closeSync, existsSync, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, readSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { PLAN_NAME, readRepoFile, runNames, sanitize, validName } from "./repo-read.mjs";
 
-export const PLAN_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+export { PLAN_NAME, sanitize };
 export const CREW = ["conductor", "coder", "ux", "db", "reviewer", "runner", "senior"];
 const SCOPE = "autopilot" + ":";
-const MAX_REASON = 200;
 const MAX_READ = 1024;
-
-const validPlan = (name) => typeof name === "string" && PLAN_NAME.test(name) && !name.includes("..");
-
-// The text reaches a model and, through it, a shell line: only a plain allowlist survives.
-export function sanitize(reason, max = MAX_REASON) {
-  return String(reason ?? "")
-    // eslint-disable-next-line no-control-regex
-    .replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g, " ")
-    .replace(/[^A-Za-z0-9 ._:,()/-]/g, " ")
-    .replace(/ {2,}/g, " ")
-    .trim()
-    .slice(0, max);
-}
 
 export function runsDir(cwd = process.cwd()) {
   const r = spawnSync("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], { cwd, encoding: "utf8" });
@@ -37,31 +24,14 @@ export function runsDir(cwd = process.cwd()) {
 }
 
 export function readReason(file) {
-  let fd;
-  try {
-    if (!lstatSync(file).isFile()) return null;
-    fd = openSync(file, "r");
-    if (!fstatSync(fd).isFile()) return null;
-    const buf = Buffer.alloc(MAX_READ);
-    const n = readSync(fd, buf, 0, MAX_READ, 0);
-    return sanitize(buf.toString("utf8", 0, n).split(/\r\n|\r|\n/)[0]);
-  } catch {
-    return null;
-  } finally {
-    if (fd !== undefined) closeSync(fd);
-  }
+  const text = readRepoFile(file, MAX_READ);
+  return text === null ? null : sanitize(text.split(/\r\n|\r|\n/)[0]);
 }
 
 export function pausedRuns(runs) {
-  let names;
-  try {
-    names = readdirSync(runs);
-  } catch {
-    return [];
-  }
   const out = [];
-  for (const plan of names.sort()) {
-    if (!validPlan(plan)) continue;
+  // runs is <root>/.autopilot/runs; runNames re-checks both directories and every name.
+  for (const plan of runNames(dirname(dirname(runs))).sort()) {
     const reason = readReason(join(runs, plan, "PAUSE"));
     if (reason !== null) out.push({ plan, reason });
   }
@@ -140,7 +110,7 @@ function cli(args) {
     say("usage: pause.mjs set <plan> <reason...> | clear <plan> | show");
     return 0;
   }
-  if (!validPlan(plan)) {
+  if (!validName(plan)) {
     say(`pause: refused plan name "${sanitize(plan)}"`);
     return 0;
   }

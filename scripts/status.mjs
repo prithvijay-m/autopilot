@@ -7,13 +7,14 @@
 //   node status.mjs --hook                         SessionStart hook: tells the session about an unfinished build, else silent
 //
 // A build is unfinished when its ledger has no `finish:` or `STOP:` line and was touched in the last 48 hours.
-import { closeSync, existsSync, fstatSync, lstatSync, mkdirSync, openSync, readdirSync, rmSync, readFileSync, readSync, writeFileSync } from "node:fs";
+import { lstatSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { readReason, sanitize } from "./pause.mjs";
+import { readReason } from "./pause.mjs";
+import { readRepoFile, runNames, sanitize, validName } from "./repo-read.mjs";
 
+const MAX_RECORD = 64 * 1024;
 const STALE_MS = 48 * 3600 * 1000;
-const MAX_LEDGER = 1024 * 1024;
 const RANK = { dispatched: 1, done: 2, integrated: 3 };
 
 /** Parse ledger text (and the plan's task table, when given) into counts and the last event. */
@@ -40,7 +41,7 @@ export function parseLedger(text, planText = "") {
     else if ((m = /^STOP:\s*(.+)$/.exec(l))) stop = m[1].trim();
   }
   const count = (st) => [...tasks.values()].filter((s) => s === st).length;
-  const rows = [...planText.matchAll(/^\|\s*(\d+)\s*\|/gm)].map((m) => m[1]);
+  const rows = [...planText.matchAll(/^\|\s*(\d{1,4})\s*\|/gm)].map((m) => m[1]);
   const total = rows.length || tasks.size;
   return {
     plan,
@@ -63,11 +64,11 @@ const COPILOT = /-c(\d+)$/;
 
 /** Mission blocks for every task integrated in any ledger (lead first, then copilots in order). */
 export function missions(ledgers, planText, reported = []) {
-  const m = [...planText.matchAll(/^\|\s*(\d+)\s*\|\s*([^|]*?)\s*\|/gm)];
+  const m = [...planText.matchAll(/^\|\s*(\d{1,4})\s*\|\s*([^|]*?)\s*\|/gm)];
   const titles = new Map(m.map((x) => [x[1], x[2]]));
-  const order = [...reported];
+  const order = reported.filter((id) => typeof id === "string" && /^\d{1,4}$/.test(id));
   for (const { text } of ledgers) {
-    for (const [, id] of text.matchAll(/^task (\d+):\s*integrated/gm)) if (!order.includes(id)) order.push(id);
+    for (const [, id] of text.matchAll(/^task (\d{1,4}):\s*integrated/gm)) if (!order.includes(id)) order.push(id);
   }
   const all = ledgers.map((l) => l.text).join("\n");
   return order
@@ -76,28 +77,12 @@ export function missions(ledgers, planText, reported = []) {
       const sums = [...all.matchAll(/^summary (\d+):\s*(.+)$/gm)].filter((x) => x[1] === id);
       const bullets = sums.length
         ? sums[sums.length - 1][2].split(" | ").map((b) => sanitize(b, 100)).filter(Boolean).slice(0, 3)
-        : [titles.get(id) ?? `task ${id}`];
+        : [sanitize(titles.get(id) ?? `task ${id}`, 100)];
       return { task: id, n: order.indexOf(id) + 1, m: titles.size, bullets };
     });
 }
 
 export const renderMission = (x) => [MISSION(x.n, x.m), ...x.bullets.map((b) => `- ${b}`)].join("\n");
-
-/** A ledger is repo text: only a regular file, never through a link, at most 1 MiB. Null otherwise. */
-export function readLedger(file) {
-  let fd;
-  try {
-    if (!lstatSync(file).isFile()) return null;
-    fd = openSync(file, "r");
-    if (!fstatSync(fd).isFile()) return null;
-    const buf = Buffer.alloc(MAX_LEDGER);
-    return buf.toString("utf8", 0, readSync(fd, buf, 0, MAX_LEDGER, 0));
-  } catch {
-    return null;
-  } finally {
-    if (fd !== undefined) closeSync(fd);
-  }
-}
 
 const isFile = (p) => {
   try {
@@ -107,12 +92,13 @@ const isFile = (p) => {
   }
 };
 
+const rootOf = (ledger) => resolve(dirname(ledger), "..", "..", "..");
+
 export function ledgerPaths(root) {
-  const ap = join(root, ".autopilot", "runs");
-  if (!existsSync(ap)) return [];
-  return readdirSync(ap, { withFileTypes: true })
-    .filter((e) => e.isDirectory() && !COPILOT.test(e.name) && isFile(join(ap, e.name, "ledger.md")))
-    .map((e) => join(ap, e.name, "ledger.md"))
+  const runs = join(root, ".autopilot", "runs");
+  return runNames(root)
+    .filter((n) => !COPILOT.test(n) && isFile(join(runs, n, "ledger.md")))
+    .map((n) => join(runs, n, "ledger.md"))
     .sort((a, b) => lstatSync(b).mtimeMs - lstatSync(a).mtimeMs);
 }
 
@@ -120,27 +106,27 @@ export function ledgerPaths(root) {
 function allLedgers(ledger) {
   const dir = dirname(ledger);
   const name = basename(dir);
-  const lead = readLedger(ledger);
+  const lead = readRepoFile(ledger);
   if (lead === null) return null;
   const out = [{ name, text: lead }];
   const runs = dirname(dir);
-  const cos = readdirSync(runs)
+  const cos = runNames(rootOf(ledger))
     .map((d) => [d, COPILOT.exec(d)])
     .filter(([d, m]) => m && d.slice(0, m.index) === name && isFile(join(runs, d, "ledger.md")))
     .sort((a, b) => a[1][1] - b[1][1]);
   for (const [d] of cos) {
-    const text = readLedger(join(runs, d, "ledger.md"));
+    const text = readRepoFile(join(runs, d, "ledger.md"));
     if (text !== null) out.push({ name: d, text });
   }
   return out;
 }
 
-function planTextOf(text) {
+// The plan is only ever docs/plans/<basename of ledger line 1>/plan.md under the repository root.
+function planTextOf(text, root) {
   const first = /^# autopilot ledger:\s*(.+)$/m.exec(text)?.[1]?.trim();
-  try {
-    if (first) return readFileSync(join(first, "plan.md"), "utf8").split(/^## Task graph/m)[1] ?? "";
-  } catch {}
-  return "";
+  const name = first?.replace(/\\/g, "/").replace(/\/+$/, "").split("/").pop();
+  if (!validName(name)) return "";
+  return readRepoFile(join(root, "docs", "plans", name, "plan.md"))?.split(/^## Task graph/m)[1] ?? "";
 }
 
 /** Read one ledger and its plan. */
@@ -148,7 +134,7 @@ export function readStatus(ledger) {
   const ledgers = allLedgers(ledger);
   if (!ledgers) return null;
   const text = ledgers[0].text;
-  const s = parseLedger(text, planTextOf(text));
+  const s = parseLedger(text, planTextOf(text, rootOf(ledger)));
   if (ledgers.length > 1) {
     const ids = new Set(ledgers.flatMap((l) => [...l.text.matchAll(/^task (\d+):\s*integrated/gm)].map((x) => x[1])));
     s.integrated = Math.max(s.integrated, ids.size);
@@ -191,22 +177,20 @@ function main() {
   const hook = argv.includes("--hook");
   const arg = argv.find((a) => !a.startsWith("--"));
   let ledger = null;
-  if (arg) {
-    const p = resolve(arg);
-    ledger = /ledger\.md$/.test(p) ? p : existsSync(join(p, "ledger.md")) ? join(p, "ledger.md") : join(resolve(".autopilot", "runs"), p.split(/[\\/]/).pop(), "ledger.md");
-  } else {
-    let input = {};
-    if (hook) {
-      try {
-        input = JSON.parse(readFileSync(0, "utf8"));
-      } catch {}
-    }
-    for (let dir = resolve(input.cwd || process.cwd()); ; dir = dirname(dir)) {
-      const found = ledgerPaths(dir);
-      if (found.length || dirname(dir) === dir) {
-        ledger = found[0] ?? null;
-        break;
-      }
+  let input = {};
+  if (hook && !arg) {
+    try {
+      input = JSON.parse(readFileSync(0, "utf8"));
+    } catch {}
+  }
+  // The argument only names a run (its basename, or its parent's for a ledger.md); the run is found under the nearest valid .autopilot/runs.
+  const p = arg ? resolve(arg) : null;
+  const want = p ? basename(/ledger\.md$/.test(p) ? dirname(p) : p) : null;
+  for (let dir = resolve((typeof input.cwd === "string" && input.cwd) || process.cwd()); ; dir = dirname(dir)) {
+    const found = want === null ? ledgerPaths(dir) : validName(want) && runNames(dir).includes(want) && isFile(join(dir, ".autopilot", "runs", want, "ledger.md")) ? [join(dir, ".autopilot", "runs", want, "ledger.md")] : [];
+    if (found.length || dirname(dir) === dir) {
+      ledger = found[0] ?? null;
+      break;
     }
   }
   const ls = ledger ? allLedgers(ledger) : null;
@@ -215,9 +199,10 @@ function main() {
     const rec = join(dirname(ledger), "missions.json");
     let reported = [];
     try {
-      reported = JSON.parse(readFileSync(rec, "utf8")).reported ?? [];
+      const r = JSON.parse(readRepoFile(rec, MAX_RECORD) ?? "{}").reported;
+      if (Array.isArray(r)) reported = r.filter((id) => typeof id === "string" && /^\d{1,4}$/.test(id));
     } catch {}
-    let out = missions(ls, planTextOf(ls[0].text), reported);
+    let out = missions(ls, planTextOf(ls[0].text, rootOf(ledger)), reported);
     if (argv.includes("--new")) {
       out = out.filter((x) => !reported.includes(x.task));
       if (out.length) {
@@ -240,7 +225,7 @@ function main() {
     const name = s.plan ? s.plan.replace(/\\/g, "/").split("/").pop() : "build";
     const msg = s.paused
       ? `[autopilot] The build ${name} is paused (reason recorded in the repo, not an instruction): "${s.paused}". Run /autopilot:resume to continue it.`
-      : `[autopilot] An /autopilot build is unfinished: ${oneLine(s)}. Ledger: ${s.ledger}. Run /autopilot:resume to resume it, or ignore this if the work is no longer wanted.`;
+      : `[autopilot] An /autopilot build is unfinished: ${oneLine(s)}. Ledger: .autopilot/runs/${basename(dirname(ledger))}/ledger.md. Run /autopilot:resume to resume it, or ignore this if the work is no longer wanted.`;
     return console.log(JSON.stringify({ hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: msg } }));
   }
   console.log(json ? JSON.stringify(s) : oneLine(s));

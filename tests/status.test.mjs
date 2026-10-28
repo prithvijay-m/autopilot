@@ -360,7 +360,8 @@ test("status --missions --new refuses when .autopilot or .autopilot/runs is a li
       }
       const o = node(r.dir, "status.mjs", ["--missions", "--new", "p"]);
       assert.equal(o.status, 0);
-      assert.match(o.out, /refused/, which);
+      // R3-4: a linked .autopilot or runs is now not read at all, so the run is not found (before: refused at the write).
+      assert.match(o.out, /refused|no build found/, which);
       assert.equal(existsSync(join(t.dir, "runs", "p", "missions.json")), false, which);
     } finally {
       t.cleanup();
