@@ -197,3 +197,42 @@ describe("pause hook", () => {
     assert.equal(v.status, 0);
   });
 });
+
+describe("pause hardening (verify round 1)", () => {
+  it("sanitize allowlists the reason", () => {
+    assert.doesNotMatch(sanitize('a "$(x)" `y`; z\\w $HOME'), /["$`;\\]/);
+    assert.equal(sanitize("task 03: reset again after an intervention"), "task 03: reset again after an intervention");
+    assert.equal(sanitize("manual intervention"), "manual intervention");
+  });
+
+  it("set prints the allowlisted reason and blocks() carries no shell metacharacters", () => {
+    const r = repo();
+    assert.equal(node(r.dir, "pause.mjs", ["set", "p", "r $(x)"]).out, "paused: p: r (x)");
+    const msg = blocks(dispatch(scoped("coder")), [{ plan: "p", reason: "$(touch f)" }]);
+    assert.doesNotMatch(msg, /[$`]/);
+  });
+
+  it("clear refuses a linked runs dir and leaves the linked PAUSE", () => {
+    const r = repo();
+    const out = tempDir();
+    cleanups.push(out.cleanup);
+    mkdirSync(join(out.dir, "p"), { recursive: true });
+    writeFileSync(join(out.dir, "p", "PAUSE"), "keep\n");
+    mkdirSync(join(r.dir, ".autopilot"), { recursive: true });
+    symlinkSync(out.dir, join(r.dir, ".autopilot", "runs"));
+    assert.equal(node(r.dir, "pause.mjs", ["clear", "p"]).out, 'pause: refused plan name "p"');
+    assert.ok(existsSync(join(out.dir, "p", "PAUSE")));
+  });
+
+  it("clear refuses a PAUSE that is a symlink and leaves the target", () => {
+    const r = repo();
+    const out = tempDir();
+    cleanups.push(out.cleanup);
+    const target = join(out.dir, "t");
+    writeFileSync(target, "keep\n");
+    mkdirSync(join(r.dir, ".autopilot", "runs", "p"), { recursive: true });
+    symlinkSync(target, flag(r, "p"));
+    assert.match(node(r.dir, "pause.mjs", ["clear", "p"]).out, /refused/);
+    assert.equal(readFileSync(target, "utf8"), "keep\n");
+  });
+});
