@@ -1,6 +1,6 @@
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { problems, proposal, proposalPath } from "../scripts/retro.mjs";
 import { node, tempDir, tempRepo } from "./helpers.mjs";
@@ -98,4 +98,31 @@ test("CLI: none, written, missing", () => {
   o = runCli([join(run, "nope"), "--out", r.dir]);
   assert.equal(o.status, 0);
   assert.match(o.out, /^retro: no ledger at /);
+});
+
+test("CLI: a dangling proposal link creates no file at its target", () => {
+  const r = repo();
+  const run = scratch();
+  const outside = scratch();
+  writeFileSync(join(run, "ledger.md"), `${HEAD}task 07: parked why\ntask 05: fix round 3/3\n`);
+  mkdirSync(join(r.dir, "docs", "improvements"), { recursive: true });
+  const link = join(r.dir, "docs", "improvements", "2026-10-28-demo-plan.md");
+  symlinkSync(join(outside, "never.md"), link);
+  const o = runCli([run, "--out", r.dir, "--date", "2026-10-28"]);
+  assert.equal(o.status, 0);
+  assert.ok(!existsSync(join(outside, "never.md")), "nothing written through the link");
+  assert.ok(existsSync(join(r.dir, "docs", "improvements", "2026-10-28-demo-plan-2.md")), "proposal goes to the -2 name");
+});
+
+test("CLI: a docs/improvements link creates nothing in its target directory", () => {
+  const r = repo();
+  const run = scratch();
+  const outside = scratch();
+  writeFileSync(join(run, "ledger.md"), `${HEAD}task 07: parked why\ntask 05: fix round 3/3\n`);
+  mkdirSync(join(r.dir, "docs"), { recursive: true });
+  symlinkSync(outside, join(r.dir, "docs", "improvements"));
+  const o = runCli([run, "--out", r.dir, "--date", "2026-10-28"]);
+  assert.equal(o.status, 0);
+  assert.match(o.out, /refused/);
+  assert.deepEqual(readdirSync(outside), []);
 });

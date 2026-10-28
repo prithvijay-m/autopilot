@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { after, test } from "node:test";
 import { citations, decide, signals, unresolvedCitations } from "../scripts/detect.mjs";
@@ -29,6 +29,27 @@ test("start writes clock.json", () => {
   const clock = JSON.parse(readFileSync(join(run, "clock.json"), "utf8"));
   assert.equal(clock["01"], "2026-01-01T00:00:00.000Z");
   assert.ok(clock["05"]);
+});
+
+test("start refuses a clock.json link and leaves its target unchanged", () => {
+  const run = scratch();
+  const outside = scratch();
+  writeFileSync(join(outside, "victim.json"), "user file\n");
+  symlinkSync(join(outside, "victim.json"), join(run, "clock.json"));
+  const r = node(run, "detect.mjs", ["start", run, "01"]);
+  assert.equal(r.status, 0);
+  assert.match(r.out, /refused/);
+  assert.equal(readFileSync(join(outside, "victim.json"), "utf8"), "user file\n");
+});
+
+test("start refuses a dangling clock.json link and creates nothing at its target", () => {
+  const run = scratch();
+  const outside = scratch();
+  symlinkSync(join(outside, "never.json"), join(run, "clock.json"));
+  const r = node(run, "detect.mjs", ["start", run, "01"]);
+  assert.equal(r.status, 0);
+  assert.match(r.out, /refused/);
+  assert.ok(!existsSync(join(outside, "never.json")));
 });
 
 test("stall at 90 minutes", () => {

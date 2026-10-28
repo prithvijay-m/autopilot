@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { add, applicable, detectStack, importLegacy, similarity } from "../scripts/lessons.mjs";
 import { node, tempDir, tempRepo } from "./helpers.mjs";
@@ -177,4 +177,62 @@ test("CLI: sync never creates .autopilot/LESSONS.md on a repository without one"
     repo.cleanup();
     home.cleanup();
   }
+});
+
+// A repository can commit links under .autopilot; sync must never write through one.
+function linkedSync(arrange, check) {
+  const repo = tempRepo({ "package.json": "{}" });
+  const home = tempDir();
+  const outside = tempDir();
+  const env = { AUTOPILOT_HOME: home.dir };
+  try {
+    node(repo.dir, "lessons.mjs", ["add", "--scope", "repo", "start the stub server before running the e2e suite -> npm run stub &"], env);
+    arrange(repo.dir, outside.dir);
+    const r = node(repo.dir, "lessons.mjs", ["sync"], env);
+    assert.equal(r.status, 0);
+    assert.match(r.out, /^lessons: refused/);
+    check(outside.dir);
+  } finally {
+    repo.cleanup();
+    home.cleanup();
+    outside.cleanup();
+  }
+}
+
+test("CLI: sync refuses a LESSONS.md link and leaves its target byte-identical", () => {
+  linkedSync(
+    (repo, outside) => {
+      writeFileSync(join(outside, "target.txt"), "user file\n");
+      mkdirSync(join(repo, ".autopilot", "runs"), { recursive: true });
+      symlinkSync(join(outside, "target.txt"), join(repo, ".autopilot", "runs", "LESSONS.md"));
+    },
+    (outside) => assert.equal(readFileSync(join(outside, "target.txt"), "utf8"), "user file\n"),
+  );
+});
+
+test("CLI: sync refuses a dangling LESSONS.md link and creates nothing at its target", () => {
+  linkedSync(
+    (repo, outside) => {
+      mkdirSync(join(repo, ".autopilot", "runs"), { recursive: true });
+      symlinkSync(join(outside, "never.txt"), join(repo, ".autopilot", "runs", "LESSONS.md"));
+    },
+    (outside) => assert.ok(!existsSync(join(outside, "never.txt"))),
+  );
+});
+
+test("CLI: sync creates nothing inside a runs directory that is a link", () => {
+  linkedSync(
+    (repo, outside) => {
+      mkdirSync(join(repo, ".autopilot"), { recursive: true });
+      symlinkSync(outside, join(repo, ".autopilot", "runs"));
+    },
+    (outside) => assert.deepEqual(readdirSync(outside), []),
+  );
+});
+
+test("CLI: sync creates nothing inside an .autopilot directory that is a link", () => {
+  linkedSync(
+    (repo, outside) => symlinkSync(outside, join(repo, ".autopilot")),
+    (outside) => assert.deepEqual(readdirSync(outside), []),
+  );
 });
