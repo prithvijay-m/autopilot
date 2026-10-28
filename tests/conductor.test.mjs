@@ -14,10 +14,10 @@ function section(prefix) {
   const parts = text.split(/^## /m).slice(1);
   const hit = parts.find((p) => p.startsWith(prefix));
   assert.ok(hit, `section "${prefix}" exists`);
-  return hit;
+  return hit.slice(hit.indexOf("\n") + 1);
 }
 const step = (sec, n) => {
-  const m = sec.match(new RegExp(`^${n}\\. \\*\\*[\\s\\S]*?(?=^\\d+\\. \\*\\*|(?![\\s\\S]))`, "m"));
+  const m = sec.match(new RegExp(`^${n}\\. [\\s\\S]*?(?=^\\d+\\. |(?![\\s\\S]))`, "m"));
   assert.ok(m, `step ${n} exists`);
   return m[0];
 };
