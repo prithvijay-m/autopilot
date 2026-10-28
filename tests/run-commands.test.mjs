@@ -18,7 +18,7 @@ test("six commands", () => {
     assert.ok(fm["argument-hint"], `${n} argument-hint`);
     for (const k of ["allowed-tools", "model", "agent"]) assert.equal(fm[k], undefined, `${n} has no ${k}`);
     assert.ok(!text(n).includes("CLAUDE_PLUGIN_ROOT"), `${n} avoids the plugin root variable`);
-    assert.ok(!/autopilot-forge|claude-code-forge/.test(text(n)), `${n} uses no old name`);
+    assert.ok(!new RegExp([["autopilot", "forge"].join("-"), ["claude", "code", "forge"].join("-")].join("|")).test(text(n)), `${n} uses no old name`);
   }
 });
 

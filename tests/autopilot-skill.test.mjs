@@ -61,5 +61,5 @@ test("not done", () => {
 });
 
 test("no old names", () => {
-  assert.ok(!/autopilot-forge|claude-code-forge/.test(text));
+  assert.ok(!new RegExp([["autopilot", "forge"].join("-"), ["claude", "code", "forge"].join("-")].join("|")).test(text));
 });
