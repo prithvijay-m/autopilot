@@ -33,11 +33,29 @@ test("build verb", () => {
 
 test("resume clears pause", () => {
   const s = section(1);
-  const i = s.indexOf('pause.mjs" clear <plan directory name>');
-  assert.ok(i > 0, "clear line present");
+  const i = s.indexOf('pause.mjs" clear "<plan directory name>"');
+  assert.ok(i > 0, "clear line present, plan quoted");
   assert.match(s, /`resume \[plan\]`/);
   assert.ok(s.indexOf("`build [plan]`") < s.indexOf("| What you find"), "verbs come first");
   assert.match(s.slice(i), /then Build/);
+});
+
+test("resume branches on the printed line and shows other pauses", () => {
+  const s = section(1);
+  const r = s.slice(s.indexOf("`resume [plan]`"), s.indexOf("| What you find"));
+  assert.ok(r.includes("`resumed: `") && r.includes("`not paused: `"), "continues on both lines");
+  assert.match(r, /never on the exit code/);
+  assert.ok(r.includes('pause.mjs" show'), "runs show");
+  assert.match(r, /every other `paused: ` line/);
+  assert.ok(r.includes("/autopilot:resume <plan>"), "gives the resume command");
+  assert.ok(r.indexOf('clear "') < r.indexOf('pause.mjs" show'));
+});
+
+test("plan name is one directory name", () => {
+  assert.ok(text.includes("^[A-Za-z0-9][A-Za-z0-9._-]*$"));
+  assert.ok(!text.includes("^[A-Za-z0-9._/][A-Za-z0-9._/-]*$"));
+  assert.match(text, /no `\/`/);
+  assert.match(text, /must not contain `\.\.`/);
 });
 
 test("mission relay", () => {

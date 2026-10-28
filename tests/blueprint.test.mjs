@@ -76,7 +76,7 @@ test("preview procedure shape", () => {
   const t = preview();
   assert.ok(t.length > 0, "PREVIEW.md exists");
   assert.ok(t.includes("<scripts>") && !t.includes("${CLAUDE_PLUGIN_ROOT}"));
-  assert.match(t, /\^\[A-Za-z0-9\._\/\]\[A-Za-z0-9\._\/-\]\*\$/);
+  assert.ok(t.includes("^[A-Za-z0-9][A-Za-z0-9._-]*$"));
   assert.match(t, /newest plan[^\n]*preview\/index\.html/);
   assert.match(t, /file missing/);
 });

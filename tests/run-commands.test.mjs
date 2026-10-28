@@ -95,13 +95,13 @@ test("arguments are data", () => {
   }
 });
 
-const PLAN_PATTERN = "^[A-Za-z0-9._/][A-Za-z0-9._/-]*$";
+const PLAN_PATTERN = "^[A-Za-z0-9][A-Za-z0-9._-]*$";
 
 test("plan name pattern forbids a leading dash and dot-dot", () => {
   for (const n of ["merge", "test", "deploy"]) {
     const b = body(n);
     assert.ok(b.includes(`\`${PLAN_PATTERN}\``), `${n} pattern`);
-    assert.match(b, /token starting with `-` is not valid/, n);
+    assert.match(b, /no `\/`/, n);
     assert.match(b, /must not contain `\.\.`/, n);
   }
 });

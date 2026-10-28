@@ -117,9 +117,9 @@ test("procedure data rule first", () => {
 });
 
 test("procedure token rule", () => {
-  assert.ok(procedure.includes("^[A-Za-z0-9._/][A-Za-z0-9._/-]*$"));
+  assert.ok(procedure.includes("^[A-Za-z0-9][A-Za-z0-9._-]*$"));
   assert.match(procedure, /one double-quoted argument/);
-  assert.match(procedure, /starts with `-`/);
+  assert.match(procedure, /no `\/`/);
 });
 
 test("procedure sizing", () => {

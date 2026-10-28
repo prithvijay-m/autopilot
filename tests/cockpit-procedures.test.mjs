@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -130,4 +130,36 @@ test("flags tools, tests, agents; patch read; check after diff", () => {
   assert.match(im, /`agents\/`[^\n]*`commands\/`[^\n]*`skills\/`[^\n]*(shell)/);
   assert.match(im, /read that file's part of the `## Patch`[^\n]*fenced block[^\n]*data/);
   assert.match(im, /only after the user has reviewed `git diff`/);
+});
+
+const SLASH_PLAN = "^[A-Za-z0-9._/][A-Za-z0-9._/-]*$";
+const walk = (d) => readdirSync(join(root, d), { withFileTypes: true }).flatMap((e) =>
+  e.isDirectory() ? walk(join(d, e.name)) : [join(d, e.name)]);
+
+test("no procedure or command carries the slash-allowing plan pattern", () => {
+  // SCOUT.md tokens are tool names. IMPROVE.md's `--root` is a directory path, not a plan name.
+  const files = [...walk("commands"), ...walk("skills")].filter((f) => f.endsWith(".md") && !f.endsWith("SCOUT.md"));
+  assert.ok(files.length > 10, "scans the tree");
+  for (const f of files) {
+    const bad = read(f).split("\n").filter((l) => l.includes(SLASH_PLAN) && !l.includes("`--root`"));
+    assert.equal(bad.length, 0, `${f} uses the slash-allowing pattern`);
+  }
+});
+
+for (const f of ["skills/cockpit/PREVIEW.md", "skills/cockpit/COPILOT.md", "skills/cockpit/SKILL.md", "commands/test.md", "commands/merge.md", "commands/deploy.md"]) {
+  test(`${f}: plan is one directory name`, () => {
+    const t = read(f);
+    assert.ok(t.includes(PLAN), "single directory pattern");
+    assert.match(t, /no `\/`/);
+    assert.match(t, /must not contain `\.\.`/);
+  });
+}
+
+test("preview and copilot define PLAN as a directory under docs/plans", () => {
+  for (const f of ["skills/cockpit/PREVIEW.md", "skills/cockpit/COPILOT.md"]) assert.ok(read(f).includes("PLAN is `<repo>/docs/plans/<token>`"), f);
+  assert.match(read("skills/cockpit/COPILOT.md"), /`<plan>` is that token/);
+});
+
+test("commands: a missing plan still stops", () => {
+  for (const f of ["test", "merge", "deploy"]) assert.match(read(`commands/${f}.md`), /If no such file exists, say so and stop/);
 });
