@@ -1,7 +1,7 @@
 import { after, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { node, scripts, sh, tempDir, tempRepo } from "./helpers.mjs";
@@ -60,6 +60,29 @@ describe("pause CLI", () => {
     assert.deepEqual(existsSync(runs) ? readdirSync(runs) : [], []);
     assert.equal(node(r.dir, "pause.mjs", ["clear", "../x"]).out, 'pause: refused plan name "../x"');
     assert.ok(PLAN_NAME.test("ok.name_1-2"));
+  });
+
+  it("set does not follow links", (t) => {
+    const r = repo();
+    const out = tempDir("forge-victim-");
+    cleanups.push(out.cleanup);
+    const victim = join(out.dir, "file");
+    writeFileSync(victim, "keep");
+    mkdirSync(join(r.dir, ".autopilot", "runs", "a"), { recursive: true });
+    try {
+      symlinkSync(victim, flag(r, "a"));
+      symlinkSync(out.dir, join(r.dir, ".autopilot", "runs", "b"), "dir");
+    } catch (e) {
+      if (e.code === "EPERM") return t.skip("no symlinks");
+      throw e;
+    }
+    const a = node(r.dir, "pause.mjs", ["set", "a", "why"]);
+    assert.equal(a.status, 0);
+    assert.equal(readFileSync(victim, "utf8"), "keep");
+    const b = node(r.dir, "pause.mjs", ["set", "b", "why"]);
+    assert.equal(b.status, 0);
+    assert.match(b.out, /^pause: refused/);
+    assert.ok(!existsSync(join(out.dir, "PAUSE")));
   });
 
   it("clear", () => {

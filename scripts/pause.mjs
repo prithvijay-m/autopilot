@@ -7,7 +7,7 @@
 // text is sanitized and never executed.
 import { spawnSync } from "node:child_process";
 import { closeSync, existsSync, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, readSync, readdirSync, rmSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 export const PLAN_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
@@ -93,6 +93,29 @@ function hook() {
   return 2;
 }
 
+// A repository can commit links under .autopilot, so the write path never follows one.
+function realDir(path) {
+  try {
+    return lstatSync(path).isDirectory();
+  } catch (e) {
+    return e.code === "ENOENT";
+  }
+}
+
+function writeFlag(dir, file, reason) {
+  const runs = dirname(dir);
+  for (const p of [dirname(runs), runs, dir]) if (!realDir(p)) return false;
+  try {
+    mkdirSync(dir, { recursive: true });
+    for (const p of [dirname(runs), runs, dir]) if (!lstatSync(p).isDirectory()) return false;
+    rmSync(file, { force: true, recursive: false });
+    writeFileSync(file, reason + "\n", { flag: "wx" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function cli(args) {
   const [cmd, plan, ...rest] = args;
   const say = (s) => console.log(s);
@@ -113,8 +136,10 @@ function cli(args) {
   const file = join(dir, "PAUSE");
   if (cmd === "set") {
     const reason = sanitize(rest.join(" "));
-    mkdirSync(dir, { recursive: true });
-    writeFileSync(file, reason + "\n");
+    if (!writeFlag(dir, file, reason)) {
+      say(`pause: refused plan name "${plan}"`);
+      return 0;
+    }
     say(`paused: ${plan}: ${reason}`);
   } else if (existsSync(file)) {
     rmSync(file, { force: true });
