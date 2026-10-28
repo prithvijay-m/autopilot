@@ -85,7 +85,7 @@ const ctx = (r) => {
 };
 test("end to end: nudge once in full, then short; silent when off or on bad input", () => {
   const checks = [
-    ["first nudge names the skill", first.status === 0 && /call the Skill tool with `autopilot-forge:autopilot`/.test(ctx(first) || "")],
+    ["first nudge names the skill", first.status === 0 && /call the Skill tool with `autopilot:autopilot`/.test(ctx(first) || "")],
     ["first nudge is valid hook JSON", JSON.parse(first.stdout).hookSpecificOutput.hookEventName === "UserPromptSubmit"],
     ["second nudge is the short reminder", second.status === 0 && /^\[autopilot\] Reminder/.test(ctx(second) || "")],
     ["a question prints nothing", quiet.status === 0 && quiet.stdout === ""],
@@ -99,7 +99,7 @@ test("targetSkill: default, env override, file override, bad values ignored", as
   const { targetSkill } = await import("../scripts/auto-trigger.mjs");
   const home = mkdtempSync(join(tmpdir(), "nudge-home-"));
   mkdirSync(join(home, ".claude"), { recursive: true });
-  assert.equal(targetSkill({}, home), "autopilot-forge:autopilot");
+  assert.equal(targetSkill({}, home), "autopilot:autopilot");
   writeFileSync(join(home, ".claude", "autopilot-auto.skill"), "autopilot\n");
   assert.equal(targetSkill({}, home), "autopilot");
   assert.equal(targetSkill({ AUTOPILOT_SKILL: "my:skill" }, home), "my:skill");
