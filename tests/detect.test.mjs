@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { after, test } from "node:test";
 import { citations, decide, signals, unresolvedCitations } from "../scripts/detect.mjs";
-import { node, tempDir, tempRepo } from "./helpers.mjs";
+import { node, scripts, tempDir, tempRepo } from "./helpers.mjs";
 
 const cleanups = [];
 after(() => cleanups.forEach((c) => c()));
@@ -191,4 +192,37 @@ test("start refuses when .autopilot or .autopilot/runs is a link and writes noth
     assert.match(r.out, /refused/, which);
     assert.ok(!existsSync(join(outside, "p")) && !existsSync(join(outside, "runs")), which);
   }
+});
+
+// ---- round 3 (R3-5): repository text is data ----
+const FAKE_SHELL = "missing file $(id) `x` | sh";
+
+test("check prints evidence without shell metacharacters", () => {
+  const run = scratch();
+  writeFileSync(join(run, "ledger.md"), `task 01: blocked: ${FAKE_SHELL}\ntask 01: blocked: ${FAKE_SHELL} again\n`);
+  const r = node(run, "detect.mjs", ["check", run, "01"]);
+  assert.equal(r.status, 0);
+  const lines = r.out.split("\n");
+  assert.ok(lines.some((l) => /^circular task 01: .* -> senior$/.test(l)), r.out);
+  assert.ok(lines.some((l) => /^missing-context task 01: .* -> context$/.test(l)), r.out);
+  for (const l of lines) assert.doesNotMatch(l.split(": ").slice(1).join(": "), /[$`|]/, l);
+});
+
+test("check with a ledger link to /dev/zero returns at once", { skip: process.platform !== "linux" }, () => {
+  const run = scratch();
+  symlinkSync("/dev/zero", join(run, "ledger.md"));
+  const t0 = Date.now();
+  const r = spawnSync(process.execPath, [join(scripts, "detect.mjs"), "check", run, "01"], { encoding: "utf8", timeout: 5000 });
+  assert.equal(r.signal, null);
+  assert.equal(r.status, 0);
+  assert.ok(Date.now() - t0 < 2000);
+});
+
+test("check ignores a clock.json link", () => {
+  const run = scratch();
+  const out = scratch();
+  writeFileSync(join(out, "c.json"), JSON.stringify({ "01": "2000-01-01T00:00:00Z" }));
+  symlinkSync(join(out, "c.json"), join(run, "clock.json"));
+  const r = node(run, "detect.mjs", ["check", run, "01"]);
+  assert.doesNotMatch(r.out, /stall/);
 });

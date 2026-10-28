@@ -1,9 +1,10 @@
 import { after, describe, test } from "node:test";
 import assert from "node:assert/strict";
-import { writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { groups, integrated, overlaps, parsePlan, size } from "../scripts/copilots.mjs";
-import { node, tempDir } from "./helpers.mjs";
+import { node, scripts, tempDir } from "./helpers.mjs";
 
 const plan = (rows) =>
   ["# Plan", "", "| # | Task | Agent | Skills | Blocked by | Touches |", "|---|---|---|---|---|---|",
@@ -131,4 +132,23 @@ describe("cli", () => {
     assert.equal(j.copilots, 2);
     assert.equal(j.crews.flat().length, 9);
   });
+});
+
+test("a plan.md link to /dev/zero gives zero copilots at once", { skip: process.platform !== "linux" }, () => {
+  const t = tempDir();
+  try {
+    symlinkSync("/dev/zero", join(t.dir, "plan.md"));
+    const t0 = Date.now();
+    const r = spawnSync(process.execPath, [join(scripts, "copilots.mjs"), t.dir, "4"], { encoding: "utf8", timeout: 5000 });
+    assert.equal(r.signal, null);
+    assert.match(r.stdout, /^copilots: 0 \(/);
+    assert.ok(Date.now() - t0 < 2000);
+  } finally {
+    t.cleanup();
+  }
+});
+
+test("parsePlan keeps only 1 to 4 digit ids", () => {
+  const ids = tasks([["1`;id", "none", "a"], ["02", "none", "b"], ["12345", "none", "c"], ["x", "none", "d"]]).map((t) => t.id);
+  assert.deepEqual(ids, ["02"]);
 });
