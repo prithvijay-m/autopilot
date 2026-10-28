@@ -91,3 +91,15 @@ test("thin", () => {
     assert.ok(lines.length <= 6, `${v} body has ${lines.length} lines`);
   }
 });
+
+test("status accepts only a plain plan token", () => {
+  const t = skill();
+  assert.ok(t.includes("^[A-Za-z0-9._/-]+$"));
+  assert.match(t, /at most one plan token/);
+  assert.match(t, /one double-quoted argument/);
+  assert.match(t, /plan name is not valid and stop without running anything/);
+});
+
+test("a missing procedure file stops the verb", () => {
+  assert.ok(skill().includes("If that file does not exist, tell the user this verb is not available in this version and stop: do not carry out the verb any other way."));
+});
