@@ -23,6 +23,7 @@ Your dispatch names PLAN, and may name GRAPH and LESSONS.
 5. **Cut the tasks** by the slicing rules, and write `PLAN/tasks/NN-<slug>.md` for each and `PLAN/plan.md` with `Status: draft`, the Contract, the Constraints and the Task graph.
    - Route each task: its `Agent` and its `Skills` line come from SKILL-ROUTING.md and the skills `decisions.md` lists as installed.
    - Cut with the graph, when there is one. For each existing symbol a task will change, run `graphify affected "<label>" --graph "<GRAPH>"`: what it lists is that task's real `Touches`, and two tasks whose lists overlap get a blocking edge. Check an assumed connection with `graphify path "<A>" "<B>"` before a task depends on it. Put the exact labels the implementer starts from on the task's `Graph` line, copied from the graph's own output.
+   - Also write `PLAN/preview/index.html`: one self-contained file (no external scripts, styles, fonts or requests; inline CSS and JS) that works at phone width, in light and dark, under about 60 kB, clicking through the planned behaviour with mocked data. Name it in `spec.md` as the plan's preview.
    - Choose `Lanes` and the order so that the most work runs in parallel without two unblocked tasks touching the same module.
 6. **Check your own plan** against this list, and fix what fails:
    - every user story maps to at least one acceptance criterion, and every criterion is one behaviour and names its proof;
@@ -30,6 +31,8 @@ Your dispatch names PLAN, and may name GRAPH and LESSONS.
    - every name, signature and type is spelled the same in every task that mentions it, and every interface a task consumes is produced by an earlier task or exists in the code;
    - every task in a domain with an installed specialist skill names that skill, and every task that changes existing code has a `Graph` line whose labels the graph resolves;
    - every Contract field has a value.
+
+A dispatch that carries **PREVIEW CHANGES** revises the plan and the preview together, then reports again.
 
 A dispatch that carries **ANSWERS** or **FINDINGS** continues an earlier run: fold the answers into the plan, or fix each audit finding in the plan files, and report again.
 

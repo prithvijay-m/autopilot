@@ -35,6 +35,7 @@ All live in `${CLAUDE_PLUGIN_ROOT}/scripts/`, run from the repository root, cost
 - **Graph brief**: `node "<scripts>/graph-brief.mjs" task <brief> RUN/graph/<NN>.md` writes a task's **CARD** (what depends on each symbol on its `Graph` line), and `node "<scripts>/graph-brief.mjs" diff <from> RUN/graph/<name>.md` writes a range's **IMPACT** (each changed symbol and the callers the diff did not touch). You run these so that no agent has to remember to ask the graph: the answers arrive in its dispatch as a file. A line saying `none` means there is no file to pass.
 - **TDD check**: `node "<scripts>/tdd-check.mjs" <from> -- <the Contract's Test command>`. It puts the source back to `<from>`, keeps the new tests, and runs them. `PASS` means the tests fail without the change. `FAIL` means they pass either way, which is a P1 finding: the tests do not test the change. `NO TESTS` and `WEAK PASS` (they failed only because a new file they import was gone, before any assertion ran) go to the reviewer as a named focus: read the assertions.
 - **Host load**: `node "<scripts>/host-load.mjs" <Lanes>` prints `lanes: N of <Lanes>`: how many lanes this machine can carry right now, never fewer than one.
+- **Copilots**: `node "<scripts>/copilots.mjs" PLAN <N> --ledger RUN/ledger.md` prints `copilots: K (...) c1: <ids> | c2: <ids>`, or `copilots: 0 (<reason>)`: how many copilots this plan supports and which tasks each takes. Only the lead runs it, and a copilot only with `--copilot`.
 - **Status**: `node "<scripts>/status.mjs"` prints one line from the ledger: tasks integrated, in flight, parked, the wave. Use it to orient after a resume.
 - **Leftover scan**: `node "<scripts>/scan-diff.mjs" <BASE>`. Every line it prints is a finding at the severity it names: secrets, env files, conflict markers, focused tests, debugger statements, debug logs, TODO markers.
 - **Detect**: `node "<scripts>/detect.mjs" start RUN <NN>` before each task's dispatch records the time, and `node "<scripts>/detect.mjs" check RUN <NN> --report <report file> --task <task file>` after each report prints one line per tripped signal (`reset`, `split`, `findings`, `senior`, `context`), `clear task NN`, or a `PAUSE` line.
@@ -49,6 +50,8 @@ RUN is `<repo root>/.autopilot/runs/<PLAN directory name>/`, and `RUN/ledger.md`
 ```
 preflight: base <sha7>, branch <name>, baseline <green|none>
 graph: <the refresh script's line, shortened>
+copilots: <line>
+copilot cN: dispatched | returned <verdict> | merged @ <sha7>
 task NN: dispatched (wave W, start <sha7>)
 task NN: done <branch> @ <sha7> | blocked: <reason> | parked: <reason>
 task NN: integrated @ <sha7>
@@ -82,6 +85,28 @@ LESSONS is `<repo root>/.autopilot/runs/LESSONS.md`: what earlier builds learned
 Read `plan.md`. Then dispatch one `runner` to: confirm the tree is clean and the `Base branch` exists; create or switch to the `Integration branch` from it; append `.autopilot/` to `.git/info/exclude`; commit PLAN when `Commit plan docs` is yes; run `Setup`, then `Gate` when `Gate baseline` is green; and return BASE (the base branch's SHA) and the tip SHA. Then run the graph refresh.
 
 A failed preflight is a Stop: a dirty tree, a missing task file, a cycle in the Task graph, an empty Contract field, a red gate on an untouched tree, or a `runner` whose commands were refused for lack of permission (say that the session needs its permission mode set to Auto).
+
+## Copilots
+
+A large plan of independent parts can be split among **copilots**: conductors, each with its own ledger and branch, inside the host's lane budget. Your dispatch says which you are.
+
+**Lead**, when the dispatch carries no `COPILOT:` field. After Preflight and the graph refresh, run `node "<scripts>/host-load.mjs" <Lanes>`, then `node "<scripts>/copilots.mjs" PLAN <N> --ledger RUN/ledger.md` with N from the host-load line, and write `copilots: <its line>` to the ledger. Decide once: when `copilots:` is already in the ledger, do not run the scripts again. With `copilots: 0`, build as before. With K of 2 or more:
+
+1. One `runner` creates `autopilot/<slug>-c<N>` from TIP for each crew.
+2. Dispatch every copilot in one message, each an `autopilot:conductor` whose prompt carries PLAN, the repository root, `COPILOT: c<N>`, `TASKS: <ids>`, `LANES: <L>`, `BRANCH: autopilot/<slug>-c<N>` and `RUN: <repo root>/.autopilot/runs/<PLAN directory name>-c<N>/`. Write `copilot cN: dispatched`.
+3. Re-dispatch, again in one message, every copilot that returns `CHECKPOINT:`.
+4. A copilot that fails to dispatch, or returns without a verdict: rule that you take its unintegrated tasks back, and build them in the frontier.
+5. When every copilot has returned `OUTCOME: copilot c<N> done`, `PAUSED:` or `STOP:`, write `copilot cN: returned <verdict>` for each. Then one `runner` merges the copilot branches in order c1, c2, ... into the integration branch with `--no-ff` and runs Gate. Write `copilot cN: merged @ <sha7>`. A conflict goes to `coder`, as in step 2.4.
+6. Then Verify and Finish as usual. Any copilot's `PAUSED:` or `STOP:` pauses or stops you the same way.
+
+On resume, with `copilots:` already in the ledger, re-dispatch only the copilots whose ledgers show no `OUTCOME`.
+
+**Copilot**, when the dispatch carries `COPILOT: c<N>`: build only TASKS, on BRANCH, with lane branches `autopilot-lane/<slug>-c<N>/NN`. At every wave run `node "<scripts>/host-load.mjs" <LANES>`, and take no more lanes than it prints. Never run the copilots script except with `--copilot`, and never dispatch a conductor. Skip Push early, Verify and Finish. End with `OUTCOME: copilot c<N> done` and the integrated ids. Your ledger starts with:
+
+```
+# autopilot ledger: <PLAN>
+copilot: c<N> tasks <ids> branch <BRANCH>
+```
 
 ## 2. Run the frontier
 
