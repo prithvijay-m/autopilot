@@ -261,7 +261,7 @@ test("a ledger.md link to /proc/self/environ prints no environment", { skip: !ex
     linkedLedger(r, "/proc/self/environ");
     for (const args of [[], ["--hook"]]) {
       const o = node(r.dir, "status.mjs", args, { FAKE_LEDGER_ENV: "FAKE_ENV_MARKER" });
-      assert.doesNotMatch(o.out, /FAKE_ENV_MARKER|PATH=/, args.join(" "));
+      assert.doesNotMatch(o.out, /\w=\w/, args.join(" "));
     }
   } finally {
     r.cleanup();
