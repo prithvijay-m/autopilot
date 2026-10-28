@@ -8,7 +8,7 @@
 // A repo lesson that a second project reports too is promoted to machine by itself.
 //
 //   node lessons.mjs sync                         write the lessons that apply to THIS repository
-//                                                 to .autopilot/LESSONS.md and print one line
+//                                                 to .autopilot/runs/LESSONS.md and print one line
 //   node lessons.mjs add --scope <scope> "<what happened -> what to do instead>"
 //   node lessons.mjs drop "<text fragment>"       remove matching lessons that apply here
 //   node lessons.mjs list                         everything, all projects
@@ -18,9 +18,8 @@
 //
 // Store: ~/.claude/autopilot/lessons.json (rendered beside it as lessons-all.md for reading).
 // AUTOPILOT_HOME overrides that directory. Always exits 0.
-// `sync` also takes in a hand-kept .autopilot/LESSONS.md the first time it meets one, so a project
-// that kept lessons by hand keeps them. A file this script wrote carries the marker below and is
-// never taken back in.
+// `sync` never reads, copies or renames a hand-kept .autopilot/LESSONS.md; `import <file>` takes one in.
+// A file this script wrote carries the marker below and is never taken back in.
 import { spawnSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
@@ -258,25 +257,12 @@ function main() {
   const store = load();
   if (cmd === "sync") {
     const stack = detectStack(project);
-    const kept = join(project, ".autopilot", "LESSONS.md");
-    if (existsSync(kept)) {
-      const prior = readFileSync(kept, "utf8");
-      if (!prior.includes(MARK)) {
-        const stats = {};
-        const n = importLegacy(store, prior, project, null, stats);
-        if (n) save(store);
-        // The file is about to be replaced by the generated one: keep what was written by hand.
-        const hand = join(project, ".autopilot", existsSync(join(project, ".autopilot", "LESSONS.hand.md")) ? `LESSONS.hand-${Date.now()}.md` : "LESSONS.hand.md");
-        copyFileSync(kept, hand);
-        if (stats.bullets > stats.seen) console.log(`lessons: ${stats.bullets - stats.seen} line(s) of the hand-kept LESSONS.md are not in the dated "- YYYY-MM-DD text" form and were not imported; the original is kept at ${hand.replace(/\\/g, "/")}`);
-      }
-    }
     const { text, counts } = renderFor(store, project, stack);
     const total = counts.repo + counts.stack + counts.machine;
     const stackNote = `stack: ${stack.length ? stack.join(", ") : "none detected"}`;
     if (!total) return console.log(`lessons: none yet (${stackNote})`);
-    const file = join(project, ".autopilot", "LESSONS.md");
-    mkdirSync(join(project, ".autopilot"), { recursive: true });
+    const file = join(project, ".autopilot", "runs", "LESSONS.md");
+    mkdirSync(join(project, ".autopilot", "runs"), { recursive: true });
     writeFileSync(file, text);
     keepOutOfGit(project);
     return console.log(`lessons: ${counts.repo} for this repository, ${counts.stack} for its stack, ${counts.machine} for this machine (${stackNote}) -> ${file.replace(/\\/g, "/")}`);

@@ -325,8 +325,8 @@ export function runActive(cwd) {
         if (fresh(state) && JSON.parse(readFileSync(state, "utf8")).phase !== "done") return true;
       } catch {}
       try {
-        for (const e of readdirSync(ap, { withFileTypes: true })) {
-          const ledger = join(ap, e.name, "ledger.md");
+        for (const e of readdirSync(join(ap, "runs"), { withFileTypes: true })) {
+          const ledger = join(ap, "runs", e.name, "ledger.md");
           if (e.isDirectory() && fresh(ledger) && !/^(finish|STOP):/m.test(readFileSync(ledger, "utf8"))) return true;
         }
       } catch {}
