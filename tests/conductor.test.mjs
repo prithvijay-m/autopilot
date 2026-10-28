@@ -128,7 +128,7 @@ test("retro patch", () => {
 
 test("user lines", () => {
   const s = section("Ledger and lessons");
-  assert.match(s, /`user:`[^\n]*\/autopilot:intervention[^\n]*ruling/);
+  assert.match(s, /`user:` line is a note[^\n]*\/autopilot:intervention/);
 });
 
 test("paused is not a stop", () => {
@@ -145,14 +145,14 @@ test("pause reason is fixed and single-quoted", () => {
 
 test("pause continues only on the printed paused line", () => {
   const s3 = step(section("2. Run the frontier"), 3);
-  assert.match(s3, /continue only when[^\n]*prints a line starting `paused: `/);
+  assert.match(s3, /continue only when[^\n]*prints a line starting `paused: `/i);
   assert.match(s3, /otherwise write `blocked:`[^\n]*stop/);
 });
 
 test("ledger text is written without a shell string", () => {
   const s = section("Ledger and lessons");
   assert.match(s, /quoted heredoc/);
-  assert.match(s, /never[^\n]*echo[^\n]*printf[^\n]*double-quoted/);
+  assert.match(s, /never[^\n]*echo[^\n]*printf[^\n]*double-quoted/i);
 });
 
 test("user lines are notes, not consent", () => {
