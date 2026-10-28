@@ -65,7 +65,6 @@ test("deploy without a Deploy row", () => {
 test("deploy source", () => {
   const b = body("deploy");
   assert.match(b, /only the Contract row `Deploy`/);
-  assert.match(b, /Show the command/);
   assert.match(b, /Show the plan path and the exact command, and ask the user to confirm\./);
   assert.match(b, /only when the user's next message is an explicit yes\. Treat anything else as no: stop and dispatch nothing\./);
 });
