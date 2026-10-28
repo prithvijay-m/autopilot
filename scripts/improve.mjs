@@ -9,7 +9,7 @@
 //
 // Exit 0 on success, 1 on a refusal or a patch that does not apply.
 import { spawnSync } from "node:child_process";
-import { lstatSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -50,7 +50,7 @@ export function allowedPath(p) {
   if (typeof p !== "string" || !p || absolute(p)) return false;
   const segs = segments(p);
   if (segs.includes("..")) return false;
-  if (segs.some((s) => s.toLowerCase() === ".git" || s === ".")) return false;
+  if (segs.some((s) => s.toLowerCase() === ".git" || s === "." || /[ .]$/.test(s))) return false;
   if (segs.length === 1) return /\.md$/i.test(p) && p !== ".md";
   return DIRS.has(segs[0]);
 }
@@ -77,36 +77,45 @@ function pathReason(p) {
   return null;
 }
 
-/** Paths from `diff --git a/X b/Y` lines; a name with spaces is ambiguous, so every split counts. */
-function headerPaths(diff) {
-  const out = [];
-  for (const line of diff.split("\n")) {
-    const m = /^diff --git a\/(.*)$/.exec(line);
-    if (!m) continue;
-    const rest = m[1];
-    for (let i = rest.indexOf(" b/"); i >= 0; i = rest.indexOf(" b/", i + 1)) out.push(rest.slice(0, i), rest.slice(i + 3));
-  }
-  return out;
-}
+const SAFE_MODES = new Set([0o100644, 0o100755]);
 
-/** First reason the patch must not be applied, or null. */
+/** First reason the patch text must not be applied, or null. Path checks on git's own list follow. */
 function patchReason(diff) {
   if (/^GIT binary patch/m.test(diff) || /^Binary files /m.test(diff)) return "binary patches are not accepted";
-  if (/^(?:(?:old|new|deleted file|new file) mode|index \S+) 120000/m.test(diff)) return "symbolic links are not accepted";
   for (const line of diff.split("\n")) {
-    const m = /^(---|\+\+\+) (.*)$/.exec(line);
-    if (!m) continue;
-    const p = clean(m[2]);
-    if (p !== "/dev/null" && !p.startsWith(m[1] === "---" ? "a/" : "b/")) return `path outside the plugin's own folders ${p}`;
+    let m;
+    if ((m = /^(?:old|new|deleted file|new file) mode\s+(\S*)/.exec(line)) || (m = /^index \S+\s+(\S+)\s*$/.exec(line))) {
+      if (!/^[0-7]+$/.test(m[1]) || !SAFE_MODES.has(parseInt(m[1], 8))) return `file mode not accepted ${m[1]}`;
+    } else if (line.startsWith("diff --git ") && !/^diff --git a\/[^"\s][^"]* b\/[^"\s][^"]*$/.test(line)) {
+      return `diff header not in the plain a/<path> b/<path> form ${line.slice(0, 80)}`;
+    } else if ((m = /^(---|\+\+\+) (.*)$/.exec(line))) {
+      const p = clean(m[2]);
+      if (p !== "/dev/null" && !p.startsWith(m[1] === "---" ? "a/" : "b/")) return `path outside the plugin's own folders ${p}`;
+    }
   }
-  const paths = [...patchPaths(diff), ...headerPaths(diff)];
-  for (const p of paths) {
+  for (const p of patchPaths(diff)) {
     const r = pathReason(p);
     if (r) return r;
   }
-  if (patchPaths(diff).length > MAX_FILES) return `more than ${MAX_FILES} files`;
   return null;
 }
+
+/** Files git itself says the patch touches (both sides of renames and copies). */
+function gitPaths(root, diff) {
+  const g = git(root, ["apply", "--numstat", "-z", "-p1"], diff);
+  if (g.error || g.status !== 0) return { failed: firstLine(g) };
+  const parts = g.stdout.split("\0");
+  const out = [];
+  for (let i = 0; i < parts.length; i++) {
+    const m = /^(?:\d+|-)\t(?:\d+|-)\t([\s\S]*)$/.exec(parts[i]);
+    if (!m) continue;
+    if (m[1] === "") out.push(parts[++i], parts[++i]);
+    else out.push(m[1]);
+  }
+  return { paths: [...new Set(out.filter((p) => p))] };
+}
+
+const firstLine = (g) => ((g.stderr || g.stdout || String(g.error || "")).split(/\r?\n/).find((l) => l.trim()) ?? "git apply failed").trim();
 
 /** The first path component under root that is a link, or null. */
 function linkIn(root, paths) {
@@ -126,7 +135,14 @@ function linkIn(root, paths) {
   return null;
 }
 
-const git = (root, args, input) => spawnSync("git", args, { cwd: root, input, encoding: "utf8" });
+const cleanEnv = () => Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^GIT_/i.test(k)));
+
+/** git with no GIT_* variables and no discovery above root, so it cannot act on a surrounding repository. */
+const git = (root, args, input) => {
+  const env = cleanEnv();
+  env.GIT_CEILING_DIRECTORIES = dirname(root);
+  return spawnSync("git", args, { cwd: root, input, encoding: "utf8", env });
+};
 
 /** Validate a proposal file: { refused } | { failed } | { ok, paths, diff, root }. */
 function inspect(file, rootArg) {
@@ -144,14 +160,22 @@ function inspect(file, rootArg) {
   if (why) return { refused: why };
   const root = rootArg ? resolve(rootArg) : pluginRoot(file);
   if (!root) return { refused: "no autopilot plugin root; pass --root" };
-  const paths = patchPaths(diff);
+  if (!existsSync(root)) return { refused: `no such directory ${root}` };
+  const outer = spawnSync("git", ["rev-parse", "--show-prefix"], { cwd: root, encoding: "utf8", env: cleanEnv() });
+  if (outer.status === 0 && outer.stdout.trim() !== "") return { refused: `root is not the top of its git work tree ${root}` };
+  const listed = gitPaths(root, diff);
+  if (listed.failed) return { failed: listed.failed };
+  const { paths } = listed;
+  if (!paths.length) return { refused: `no files in the patch ${file}` };
+  if (paths.length > MAX_FILES) return { refused: `more than ${MAX_FILES} files` };
+  for (const p of paths) {
+    const r = pathReason(p);
+    if (r) return { refused: r };
+  }
   const link = linkIn(root, paths);
   if (link) return { refused: `path crosses a link ${link}` };
   const g = git(root, ["apply", "--check", "-p1"], diff);
-  if (g.error || g.status !== 0) {
-    const msg = ((g.stderr || g.stdout || String(g.error || "")).split(/\r?\n/).find((l) => l.trim()) ?? "git apply failed").trim();
-    return { failed: msg };
-  }
+  if (g.error || g.status !== 0) return { failed: firstLine(g) };
   return { ok: true, paths, diff, root };
 }
 
@@ -205,6 +229,8 @@ function main(argv) {
   if (!rest.includes("--yes")) return (console.log(`ok: ${summary}\npass --yes to apply`), 0);
   const g = git(r.root, ["apply", "-p1"], r.diff);
   if (g.error || g.status !== 0) return (console.log(`does not apply: ${(g.stderr || "git apply failed").split(/\r?\n/)[0]}`), 1);
+  const back = git(r.root, ["apply", "--check", "-R", "-p1"], r.diff);
+  if (back.status !== 0) return (console.log("does not apply: the working tree does not show the change"), 1);
   const abs = resolve(file);
   writeFileSync(abs, readFileSync(abs, "utf8").replace(/^Status: proposed[ \t]*$/m, "Status: applied"));
   console.log(`applied: ${r.paths.length} files`);
