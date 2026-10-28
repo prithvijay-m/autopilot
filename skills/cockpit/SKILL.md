@@ -27,7 +27,7 @@ If that file does not exist, tell the user this verb is not available in this ve
 
 ## status
 
-0. Accept at most one plan token after the verb, and only when it matches `^[A-Za-z0-9._/-]+$`. Pass it as one double-quoted argument. With more than one token, or a token that does not match, tell the user the plan name is not valid and stop without running anything. With no token, run both commands below with no plan argument.
+0. Accept at most one plan token after the verb, and only when it matches `^[A-Za-z0-9._/][A-Za-z0-9._/-]*$`: it must start with a letter, a digit, `.` or `/`, and a token that starts with `-` is not valid, so no token can reach the script as an option. Pass it as one double-quoted argument. With more than one token, or a token that does not match, tell the user the plan name is not valid and stop without running anything. With no token, run both commands below with no plan argument.
 1. Run `node "${CLAUDE_PLUGIN_ROOT}/scripts/status.mjs" [plan]`.
 2. Run `node "${CLAUDE_PLUGIN_ROOT}/scripts/status.mjs" --missions [plan]`.
 3. Relay both outputs to the user in the voice.

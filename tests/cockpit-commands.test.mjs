@@ -94,7 +94,12 @@ test("thin", () => {
 
 test("status accepts only a plain plan token", () => {
   const t = skill();
-  assert.ok(t.includes("^[A-Za-z0-9._/-]+$"));
+  assert.ok(t.includes("^[A-Za-z0-9._/][A-Za-z0-9._/-]*$"));
+  assert.ok(!t.includes("^[A-Za-z0-9._/-]+$"));
+  assert.match(t, /a token that starts with `-` is not valid/);
+  const re = /^[A-Za-z0-9._\/][A-Za-z0-9._\/-]*$/;
+  for (const bad of ["--new", "--hook", "-x", "--json"]) assert.ok(!re.test(bad), bad);
+  for (const ok of ["docs/plans/x", "./p", "2026-10-28-a"]) assert.ok(re.test(ok), ok);
   assert.match(t, /at most one plan token/);
   assert.match(t, /one double-quoted argument/);
   assert.match(t, /plan name is not valid and stop without running anything/);
