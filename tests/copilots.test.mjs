@@ -74,8 +74,9 @@ describe("size", () => {
   });
   test("largest first into the smallest crew", () => {
     const r = size({ groups: [g(3, 11), g(4, 1), g(3, 21)], hostLanes: 2 });
-    assert.deepEqual(r.crews.map((c) => c.length), [7, 3]);
-    assert.deepEqual(r.crews[0], [...g(4, 1), ...g(3, 21)]);
+    assert.deepEqual(r.crews.map((c) => c.length), [4, 6]);
+    assert.deepEqual(r.crews[0], g(4, 1));
+    assert.deepEqual(r.crews[1], [...g(3, 11), ...g(3, 21)]);
   });
   test("lanes never exceed host lanes", () => {
     const gs = [g(3, 1), g(3, 11), g(3, 21), g(3, 31)];
