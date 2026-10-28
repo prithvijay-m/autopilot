@@ -30,7 +30,7 @@ How the pieces fit, and the rules that keep them from breaking.
 
 ## Rules that matter
 
-1. **Agents are dispatched by scoped name**, `autopilot-forge:coder`, so a user's own `coder` cannot shadow them.
+1. **Agents are dispatched by scoped name**, `autopilot:coder`, so a user's own `coder` cannot shadow them.
 2. **Lane branches are `autopilot-lane/<slug>/NN`.** The integration branch is `autopilot/<slug>`, and git refuses a ref that is also a directory, so a lane under `autopilot/<slug>/` could never be created.
 3. **`${CLAUDE_PLUGIN_ROOT}` is replaced only in agent and skill bodies and in hook config.** A file opened with the Read tool shows it literally. So files the pipeline reads raw (`PLAN-FORMAT.md`, `GRAPH.md`) say `<scripts>`, and the entry skill states the real root. `npm run validate` enforces this.
 4. **The ledger is the source of truth.** A conductor that restarts, whether after a crash or a checkpoint, trusts the ledger and `git log` over memory. A checkpoint after every third wave keeps one conductor's context from rotting.
