@@ -24,12 +24,13 @@ PLAN is `docs/plans/<YYYY-MM-DD>-<slug>/` in the repository. `PLAN/decisions.md`
 
 ## 1. Ground
 
-Facts before questions, and facts are your job. Through the graph and scouts, establish:
+Facts before questions, and facts are your job. First, then through the graph and scouts, establish:
 
+- **Request**: before anything else, write `$ARGUMENTS` verbatim to `PLAN/request.md` under the heading `# Original request (verbatim)`. An existing `request.md` is kept, and nothing edits it later.
 - **Repository**: greenfield or existing, default branch, clean or dirty tree, a remote and whether `gh auth status` passes.
 - **Commands**: the exact install, lint, typecheck, test (full, and one focused test), build and start commands, and whether the full gate is green right now.
 - **Rails already there**: CI, pre-commit hooks, `GLOSSARY.md`, ADRs, coding standards, `docs/agents/`.
-- **Lessons**: run `node "${CLAUDE_PLUGIN_ROOT}/scripts/lessons.mjs" sync` from the repository root. It prints the repository's stack tags and, when earlier builds left any, writes `.autopilot/LESSONS.md`: what went wrong before in this repository, in other projects on the same stack, and on this machine. Read that file. Each line that bears on a Contract field or on how a task should be cut settles it now, and the ones that matter go under Facts for the planner.
+- **Lessons**: run `node "${CLAUDE_PLUGIN_ROOT}/scripts/lessons.mjs" sync` from the repository root. It prints the repository's stack tags and, when earlier builds left any, writes `.autopilot/runs/LESSONS.md`: what went wrong before in this repository, in other projects on the same stack, and on this machine. Read that file. Each line that bears on a Contract field or on how a task should be cut settles it now, and the ones that matter go under Facts for the planner.
 - **Codebase shape**, for a repository that already has code: run `node "${CLAUDE_PLUGIN_ROOT}/scripts/graph-refresh.mjs"` from the repository root first. It builds the code graph when there is none and refreshes it when there is, with no model tokens. Then learn the shape from the graph: read `graphify-out/GRAPH_REPORT.md`, run `graphify god-nodes --top 15`, and `graphify query` each area the idea touches. Scouts go only where the graph leaves a question about behaviour.
 - **Documents in the graph**: when the repository's specs, ADRs or design docs matter to this build and the graph holds only code, tell the user once that `/graphify . --update` would add them, at a cost in model tokens, and carry on either way.
 - **Tools on this machine**: `codex` (a second model family for the final review), a browser tool (QA of a web app), `tmux` (QA of a terminal app).
@@ -67,7 +68,7 @@ Done when the frontier is empty, the user confirms the shared understanding, and
 
 ## 3. Draft the plan
 
-Dispatch one `planner` with the absolute PLAN path, the GRAPH path when there is a graph, and the LESSONS path when that file exists. Wait for its report.
+Dispatch one `planner` with the absolute PLAN path, the GRAPH path when there is a graph, and the LESSONS path when that file exists. It writes the plan and `PLAN/preview/index.html`, the clickable preview. Wait for its report.
 
 - `NEEDS_DECISIONS`: put its questions to the user as one more round of step 2, with its recommended answers, write the answers into `decisions.md`, and send them to the same planner as ANSWERS (a message to the agent that is still holding its context, or a fresh dispatch when that is not possible).
 - `DRAFTED`: the spec, the tasks and `plan.md` are on disk with `Status: draft`.
@@ -80,9 +81,11 @@ The planner wrote the plan, so it shares the plan's blind spots. Dispatch one `r
 
 A finding with one clear fix goes back to the planner as FINDINGS. A finding that needs a decision goes to the user as another round of step 2 first.
 
-## 5. Approve and hand off
+## 5. Preview, approve and hand off
 
-Show the user the goal in one sentence, the Task graph, the Contract, and every Delegated decision from the planner's report, and ask whether to approve or change the plan. This approval is the last thing the build asks of them, so a change here loops back to the step it touches.
+Read [PREVIEW.md](../cockpit/PREVIEW.md) in full and carry it out with PLAN, before the approval question. It publishes the preview and loops on it with the user. The build never starts before the user's green light on the preview. When PREVIEW.md is missing, say so and stop.
+
+Then show the user the goal in one sentence, the Task graph, the Contract, and every Delegated decision from the planner's report, and ask whether to approve or change the plan. This approval is the last thing the build asks of them, so a change here loops back to the step it touches.
 
 Once approved, set `Status` in `plan.md` to `approved <YYYY-MM-DD>`. When `/autopilot` is running this procedure, planning is done: return to it, and it builds next. Typed on its own, end with exactly this, the path filled in:
 
