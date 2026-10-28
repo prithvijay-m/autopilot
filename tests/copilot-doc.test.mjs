@@ -123,14 +123,14 @@ test("procedure token rule", () => {
 });
 
 test("procedure sizing", () => {
-  assert.ok(procedure.includes('node "${CLAUDE_PLUGIN_ROOT}/scripts/host-load.mjs"'));
-  assert.ok(procedure.includes('node "${CLAUDE_PLUGIN_ROOT}/scripts/copilots.mjs"'));
+  assert.ok(procedure.includes('node "<scripts>/host-load.mjs"'));
+  assert.ok(procedure.includes('node "<scripts>/copilots.mjs"'));
   assert.ok(procedure.indexOf("host-load.mjs") < procedure.indexOf("copilots.mjs"));
   assert.match(procedure, /--ledger/);
 });
 
 test("procedure status", () => {
-  assert.ok(procedure.includes('node "${CLAUDE_PLUGIN_ROOT}/scripts/status.mjs"'));
+  assert.ok(procedure.includes('node "<scripts>/status.mjs"'));
   assert.match(procedure, /-c<N>\/ledger\.md/);
 });
 
