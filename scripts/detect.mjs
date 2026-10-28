@@ -8,7 +8,7 @@
 // The conductor runs `start` at dispatch and `check` when the report arrives, then applies the remedy and logs
 // `intervene: task NN <signal> -> <remedy>`. A second trip after that line pauses the run instead.
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { similarity } from "./lessons.mjs";
@@ -139,11 +139,38 @@ const flag = (args, name) => {
   return i >= 0 ? args[i + 1] : undefined;
 };
 
+// A repository can commit links in a run directory, so the clock is written through a temp file and a rename.
+const realDir = (p) => {
+  try {
+    return lstatSync(p).isDirectory();
+  } catch (e) {
+    return e.code === "ENOENT";
+  }
+};
+const plainOrAbsent = (p) => {
+  try {
+    return lstatSync(p).isFile();
+  } catch (e) {
+    return e.code === "ENOENT";
+  }
+};
+
 function start(run, nn) {
-  mkdirSync(run, { recursive: true });
   const file = join(run, "clock.json");
+  const refuse = () => console.log(`clock: refused (a link or non-file in the path of ${file.replace(/\\/g, "/")}); nothing written`);
+  if (!realDir(run) || !plainOrAbsent(file)) return refuse();
+  mkdirSync(run, { recursive: true });
+  if (!lstatSync(run).isDirectory()) return refuse();
   const iso = new Date().toISOString();
-  writeFileSync(file, JSON.stringify({ ...readJson(file), [nn]: iso }, null, 2) + "\n");
+  const tmp = join(run, `.clock.json.${process.pid}`);
+  try {
+    rmSync(tmp, { force: true });
+    writeFileSync(tmp, JSON.stringify({ ...readJson(file), [nn]: iso }, null, 2) + "\n", { flag: "wx" });
+    renameSync(tmp, file);
+  } catch {
+    rmSync(tmp, { force: true });
+    return refuse();
+  }
   console.log(`clock: task ${nn} started ${iso}`);
 }
 
