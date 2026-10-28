@@ -2,6 +2,10 @@
 
 The files of a plan directory. The interviewing session writes `decisions.md`; the `planner` reads it and writes `spec.md`, `plan.md` and `tasks/`; the `conductor` builds from those three. A plan is the set of decisions an implementer cannot make alone: names, interfaces, exact values, proofs. Function bodies are theirs to write.
 
+The plan directory holds `request.md` (the user's request, verbatim, written first and never edited), `decisions.md`, `spec.md`, `plan.md`, `tasks/` and `preview/index.html` (the clickable preview).
+
+`Deploy` is optional: leave the row out, or write `none`, when the repository documents no deploy command.
+
 ## decisions.md
 
 The interview's record and the planner's only brief. Written as the interview goes, so it is also how an interrupted session resumes. Record answers, never the conversation.
@@ -114,6 +118,7 @@ What this build leaves alone.
 | Off-limits | <paths, services and actions the build must leave alone> |
 | Commit plan docs | <yes, or no> |
 | Finish | <`pr`, `draft-pr`, `branch`, or `merge`> |
+| Deploy | <the repository's documented deploy command, or none> |
 
 ## Constraints
 

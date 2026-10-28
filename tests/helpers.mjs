@@ -19,6 +19,7 @@ export function tempRepo(files = { "README.md": "# t\n" }) {
   const dir = mkdtempSync(join(tmpdir(), "forge-test-"));
   const git = (...a) => sh(dir, "git", ["-c", "user.name=t", "-c", "user.email=t@example.test", "-c", "commit.gpgsign=false", ...a]);
   git("init", "-q", "-b", "main");
+  git("config", "core.autocrlf", "false"); // fixtures are LF whatever the host default (Windows runners set autocrlf=true)
   const write = (rel, text) => {
     mkdirSync(dirname(join(dir, rel)), { recursive: true });
     writeFileSync(join(dir, rel), text);

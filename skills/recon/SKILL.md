@@ -7,7 +7,7 @@ disable-model-invocation: true
 
 # Recon
 
-Agents of this plugin are dispatched by their scoped name, `autopilot-forge:<agent>` (`autopilot-forge:planner`, `autopilot-forge:coder`), so a same-named agent of the user's cannot shadow them. The bare names in this file are shorthand for those.
+Agents of this plugin are dispatched by their scoped name, `autopilot:<agent>` (`autopilot:planner`, `autopilot:coder`), so a same-named agent of the user's cannot shadow them. The bare names in this file are shorthand for those.
 
 Reverse-engineer a target and leave a findings file behind. You orchestrate: you confirm the scope with the human, check what the engine can actually do, dispatch `analyst` subagents, review their evidence, and write the report. The analysts read and observe; the `reverse-engineer-anything` skill is the engine they drive.
 

@@ -4,3 +4,8 @@ graphify-out/
 *.log
 .DS_Store
 Thumbs.db
+
+# autopilot
+.autopilot/*
+!.autopilot/LESSONS.md
+.env

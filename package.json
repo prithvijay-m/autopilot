@@ -1,8 +1,8 @@
 {
-  "name": "autopilot-forge",
-  "version": "0.2.1",
+  "name": "autopilot",
+  "version": "0.3.0",
   "private": true,
-  "description": "Development tooling for the autopilot-forge Claude Code plugin. The plugin itself has no dependencies.",
+  "description": "Development tooling for the autopilot Claude Code plugin. The plugin itself has no dependencies.",
   "type": "module",
   "engines": { "node": ">=22" },
   "scripts": {

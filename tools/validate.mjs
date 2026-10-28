@@ -15,10 +15,15 @@ const SUBSTITUTED = (rel) => /^agents\/[^/]+\.md$/.test(rel) || /^skills\/[^/]+\
 // Files read as prose by people, where the variable is only text.
 const PROSE = (rel) => /^(README|CHANGELOG|CONTRIBUTING|SECURITY|ARCHITECTURE|CREDITS)\.md$/.test(rel) || /^docs\//.test(rel);
 
+// The old plugin and repository names, built from parts so this file never says them.
+const OLD_NAMES = [["autopilot", "forge"].join("-"), ["claude", "code", "forge"].join("-")];
+// Plans and patch proposals name files that a build or a patch has yet to create.
+const FUTURE_OK = (rel) => /^docs\/(plans|improvements)\//.test(rel);
+
 const read = (p) => readFileSync(p, "utf8");
 const json = (p) => JSON.parse(read(p));
 
-function walk(dir, skip = new Set(["node_modules", ".git", "graphify-out", ".autopilot"])) {
+function walk(dir, skip = new Set(["node_modules", ".git", "graphify-out", ".autopilot", ".impeccable"])) {
   const out = [];
   for (const e of readdirSync(dir, { withFileTypes: true })) {
     if (skip.has(e.name)) continue;
@@ -119,6 +124,23 @@ export function validate(root) {
     }
   }
 
+  // commands
+  const commandDir = join(root, "commands");
+  if (existsSync(commandDir)) {
+    for (const f of readdirSync(commandDir).filter((n) => n.endsWith(".md"))) {
+      const file = `commands/${f}`;
+      const name = basename(f, ".md");
+      const text = read(join(commandDir, f));
+      const fm = frontmatter(text);
+      if (!fm) err(file, "no frontmatter");
+      else if (!fm.description) err(file, "no description");
+      if (existsSync(join(skillDir, name))) err(file, `"${name}" is already a skill, and a skill is its own command`);
+      if (plugin && !new RegExp(`\`${plugin.name}:[a-z<][a-z<>-]*\``).test(text)) {
+        err(file, "routes to nothing: name an agent or skill of this plugin as <plugin>:<name> in backticks");
+      }
+    }
+  }
+
   // hooks
   const hooksFile = join(root, "hooks", "hooks.json");
   if (existsSync(hooksFile)) {
@@ -143,6 +165,10 @@ export function validate(root) {
   // every text file
   for (const p of walk(root)) {
     const r = rel(p);
+    if (/\.(md|json|mjs|ya?ml|html)$/.test(r) && r !== "CHANGELOG.md" && !/^docs\/plans\//.test(r)) {
+      const raw = read(p);
+      for (const old of OLD_NAMES) if (raw.includes(old)) err(r, `still says ${old}; the plugin is autopilot`);
+    }
     if (!/\.(md|json|mjs)$/.test(r) || /^tests\//.test(r) || r === "tools/validate.mjs" || r === "package-lock.json") continue;
     const text = read(p);
     if (/\$\{CLAUDE_PLUGIN_ROOT\}/.test(text) && !SUBSTITUTED(r) && !PROSE(r) && !/^scripts\//.test(r) && !/^\.claude-plugin\//.test(r)) {
@@ -152,17 +178,17 @@ export function validate(root) {
     // links
     // links inside a template or a code fence are examples for the files a build will write
     const linked = text.replace(/```[\s\S]*?```/g, "").replace(/<([a-z-]+-template|standards-seed)>[\s\S]*?<\/\1>/g, "");
-    for (const m of linked.matchAll(/\]\(([^)\s]+)\)/g)) {
+    for (const m of FUTURE_OK(r) ? [] : linked.matchAll(/\]\(([^)\s]+)\)/g)) {
       const target = m[1].split("#")[0];
       if (!target || /^[a-z]+:/i.test(target)) continue;
       if (!existsSync(resolve(dirname(p), target))) err(r, `link to ${m[1]} goes nowhere`);
     }
     // scripts named in prose
-    for (const m of text.matchAll(/(?:<scripts>|\bscripts)\/([A-Za-z0-9._-]+\.mjs)/g)) {
+    for (const m of FUTURE_OK(r) ? [] : text.matchAll(/(?:<scripts>|\bscripts)\/([A-Za-z0-9._-]+\.mjs)/g)) {
       if (!existsSync(join(root, "scripts", m[1]))) err(r, `names scripts/${m[1]}, which does not exist`);
     }
     // scoped dispatch names
-    if (plugin) {
+    if (plugin && !FUTURE_OK(r)) {
       for (const m of text.matchAll(new RegExp(`\`${plugin.name}:([a-z-]+)\``, "g"))) {
         if (m[1] !== "<agent>" && !agents.has(m[1]) && !skills.has(m[1])) err(r, `names ${plugin.name}:${m[1]}, which is neither an agent nor a skill here`);
       }

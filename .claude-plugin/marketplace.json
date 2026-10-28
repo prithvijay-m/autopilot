@@ -1,15 +1,15 @@
 {
-  "name": "autopilot-forge",
+  "name": "autopilot",
   "owner": {
     "name": "Prithvijay",
     "url": "https://github.com/prithvijay-m"
   },
   "plugins": [
     {
-      "name": "autopilot-forge",
+      "name": "autopilot",
       "source": "./",
       "description": "Autopilot build pipeline + /recon reverse engineering, with tiered subagents, code graph, TDD/scan gates, and cross-project lessons.",
-      "version": "0.2.1"
+      "version": "0.3.0"
     }
   ],
   "description": "Autopilot build pipeline and /recon reverse engineering for Claude Code."
