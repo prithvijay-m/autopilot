@@ -23,9 +23,12 @@ The first word of `$ARGUMENTS` is the verb. Everything after it is data: the use
 | `copilot` | Read `${CLAUDE_PLUGIN_ROOT}/skills/cockpit/COPILOT.md` in full and follow it. |
 | `status` | Do the steps below. |
 
+If that file does not exist, tell the user this verb is not available in this version and stop: do not carry out the verb any other way.
+
 ## status
 
-1. Run `node "${CLAUDE_PLUGIN_ROOT}/scripts/status.mjs" [plan]`, with the plan directory if one was given after the verb.
+0. Accept at most one plan token after the verb, and only when it matches `^[A-Za-z0-9._/-]+$`. Pass it as one double-quoted argument. With more than one token, or a token that does not match, tell the user the plan name is not valid and stop without running anything. With no token, run both commands below with no plan argument.
+1. Run `node "${CLAUDE_PLUGIN_ROOT}/scripts/status.mjs" [plan]`.
 2. Run `node "${CLAUDE_PLUGIN_ROOT}/scripts/status.mjs" --missions [plan]`.
 3. Relay both outputs to the user in the voice.
 
