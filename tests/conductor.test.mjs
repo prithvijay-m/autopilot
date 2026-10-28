@@ -7,7 +7,7 @@ import { missions } from "../scripts/status.mjs";
 import { decide } from "../scripts/detect.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const text = readFileSync(join(root, "agents", "conductor.md"), "utf8");
+const text = readFileSync(join(root, "agents", "conductor.md"), "utf8").replace(/\r\n/g, "\n");
 
 /** The body of the `## <title>` section (up to the next `## `). */
 function section(prefix) {
