@@ -37,11 +37,14 @@ All live in `${CLAUDE_PLUGIN_ROOT}/scripts/`, run from the repository root, cost
 - **Host load**: `node "<scripts>/host-load.mjs" <Lanes>` prints `lanes: N of <Lanes>`: how many lanes this machine can carry right now, never fewer than one.
 - **Status**: `node "<scripts>/status.mjs"` prints one line from the ledger: tasks integrated, in flight, parked, the wave. Use it to orient after a resume.
 - **Leftover scan**: `node "<scripts>/scan-diff.mjs" <BASE>`. Every line it prints is a finding at the severity it names: secrets, env files, conflict markers, focused tests, debugger statements, debug logs, TODO markers.
+- **Detect**: `node "<scripts>/detect.mjs" start RUN <NN>` before each task's dispatch records the time, and `node "<scripts>/detect.mjs" check RUN <NN> --report <report file> --task <task file>` after each report prints one line per tripped signal (`reset`, `split`, `findings`, `senior`, `context`), `clear task NN`, or a `PAUSE` line.
+- **Pause**: `node "<scripts>/pause.mjs" set <PLAN directory name> "<reason>"` stops further dispatches until the user resumes.
+- **Retro**: `node "<scripts>/retro.mjs" RUN` reads the ledger and lessons, writes an improvement proposal when the same problem repeated, and prints its path (or says there is none).
 - **Lessons**: `node "<scripts>/lessons.mjs" sync` writes LESSONS, the lessons that apply to this repository, and prints the repository's stack tags. `node "<scripts>/lessons.mjs" add --scope <scope> "<what happened -> what to do instead>"` records one, and `node "<scripts>/lessons.mjs" drop "<text fragment>"` removes one this run proved wrong.
 
 ## Ledger and lessons
 
-RUN is `<repo root>/.autopilot/<PLAN directory name>/`, and `RUN/ledger.md` is your memory: it survives compaction, and your recollection does not. Its first line is `# autopilot ledger: <absolute PLAN path>`. Append one line per event, as it happens:
+RUN is `<repo root>/.autopilot/runs/<PLAN directory name>/`, and `RUN/ledger.md` is your memory: it survives compaction, and your recollection does not. Its first line is `# autopilot ledger: <absolute PLAN path>`. Append one line per event, as it happens:
 
 ```
 preflight: base <sha7>, branch <name>, baseline <green|none>
@@ -49,6 +52,9 @@ graph: <the refresh script's line, shortened>
 task NN: dispatched (wave W, start <sha7>)
 task NN: done <branch> @ <sha7> | blocked: <reason> | parked: <reason>
 task NN: integrated @ <sha7>
+summary NN: <b1> | <b2> | <b3>
+intervene: task NN <signal> -> <remedy>
+paused: <reason>
 wave W: tdd-check <PASS|WEAK PASS|FAIL|NO TESTS|SKIPPED>
 wave W: review clean | <n> findings (<ids and severities>)
 wave W: fix round R/3: <addressed>/<open> addressed
@@ -61,13 +67,15 @@ scan: <P0/P1/P2/P3 counts>
 qa: <verdict line>
 security: <verdict line>
 review: <verdict line>
+acceptance: <verdict line>
+user: <instruction>
 checkpoint: wave W done, next <task ids>
 finish: <pull request URL | branch>
 ```
 
-A ledger that already exists and names this PLAN means the run is **resuming**: tasks with an `integrated` line are done, so continue from the first step the ledger does not show. Trust the ledger and `git log` over memory.
+A ledger that already exists and names this PLAN means the run is **resuming**: tasks with an `integrated` line are done, so continue from the first step the ledger does not show. Trust the ledger and `git log` over memory. A `user:` line, written by `/autopilot:intervention`, is an instruction from the user: honour it as a ruling.
 
-LESSONS is `<repo root>/.autopilot/LESSONS.md`: what earlier builds learned the hard way, in this repository, in other projects on the same stack, and on this machine. Before Preflight, run the lessons `sync`, read the file when its line reports any lessons, and act on each one that applies (a command that needs a flag, a setup step the Contract misses, a test that flakes, a tool this machine lacks). Note the stack tags it prints: step 4 of Finish needs them.
+LESSONS is `<repo root>/.autopilot/runs/LESSONS.md`: what earlier builds learned the hard way, in this repository, in other projects on the same stack, and on this machine. Before Preflight, run the lessons `sync`, read the file when its line reports any lessons, and act on each one that applies (a command that needs a flag, a setup step the Contract misses, a test that flakes, a tool this machine lacks). Note the stack tags it prints: step 4 of Finish needs them.
 
 ## 1. Preflight
 
@@ -80,14 +88,22 @@ A failed preflight is a Stop: a dirty tree, a missing task file, a cycle in the 
 The **frontier** is every task whose blockers are all integrated. Repeat until no task is left on it:
 
 1. **Pick the wave**: run the host load script with the plan's `Lanes`. Take up to its `lanes: N` frontier tasks (a busy machine runs fewer lanes than the plan allows, and the next wave asks again), lowest number first, no two sharing a `Touches` entry. TIP is the integration branch's head. While there is a graph, write each task's CARD with the graph brief script.
-2. **Dispatch the wave** in one message, every Agent call with `run_in_background: false`, so the lanes run side by side and you continue when all have reported.
+2. **Dispatch the wave** in one message, after running `node "<scripts>/detect.mjs" start RUN <NN>` for each task, every Agent call with `run_in_background: false`, so the lanes run side by side and you continue when all have reported.
    - A wave of one task: the agent works on the integration branch in this checkout.
    - A wave of several: each call adds `isolation: "worktree"`, and its dispatch gives BRANCH `autopilot-lane/<slug>/NN` (a lane branch cannot live under `autopilot/<slug>`, which is the integration branch: git refuses a ref that is also a directory), START = TIP, and that lane's assignment from `Shared resources`.
 3. **Read the reports.**
    - `DONE`: the task is ready to integrate. Copy its DECISIONS into the ledger as rulings made on your behalf, and a `db` task's HANDOFF as a `handoff` line. A report with no `TDD` line for a criterion it claims is a concern: name it as a focus in the wave's review.
    - `DONE_WITH_CONCERNS`: a concern about correctness or scope becomes a named focus in the wave's review.
    - `BLOCKED`: supply what was missing and dispatch once more. Blocked again: dispatch `senior`. Still blocked: park the task and every task it blocks, and carry on with the rest of the graph.
-4. **Integrate** a multi-task wave with one `runner` dispatch: `git merge --no-ff` each done branch in task order, run `Gate`, then `git worktree remove` and `git branch -d` each merged lane, returning the new tip. A CONFLICT report goes to a `coder` that calls the Skill tool with `supermatt:resolving-merge-conflicts` in this checkout and finishes the merge; then the runner resumes. A red gate enters the fix loop as a P1 finding.
+   - Run `node "<scripts>/detect.mjs" check RUN <NN> --report <report file> --task <task file>` for each report, and act on each line it prints:
+     - `reset`: dispatch again with only the task file and its card, no earlier output.
+     - `split`: rule the task into two halves by criteria, with a Ruling.
+     - `findings`: dispatch again with the unresolved citations as findings.
+     - `senior`: dispatch `senior`.
+     - `context`: dispatch again with the missing paths and the card added.
+
+     Log each remedy as `intervene: task NN <signal> -> <remedy>`. A `PAUSE` line, or a dispatch the pause hook refused, means: run `node "<scripts>/pause.mjs" set <PLAN directory name> "<reason>"`, write `paused: <reason>`, and end the turn with `PAUSED: <reason>` and the ledger path.
+4. **Integrate** a multi-task wave with one `runner` dispatch: `git merge --no-ff` each done branch in task order, run `Gate`, then `git worktree remove` and `git branch -d` each merged lane, returning the new tip. After each `task NN: integrated` line, write `summary NN:` with 1 to 3 plain bullets of at most 100 characters each, taken from the builder's report. A CONFLICT report goes to a `coder` that calls the Skill tool with `supermatt:resolving-merge-conflicts` in this checkout and finishes the merge; then the runner resumes. A red gate enters the fix loop as a P1 finding.
 5. **Check the wave yourself**, once it is on the integration branch: run the TDD check with `<from>` = TIP, then the graph refresh, then the graph brief `diff` with `<from>` = TIP to write the wave's IMPACT.
 6. **Review the wave**, unless it is the last one, which step 3 covers: one `reviewer` REVIEW dispatch with BASE = TIP, HEAD = the new tip, the wave's brief paths, the wave's IMPACT file, LENS = every skill the wave's tasks name in the `Skills` column, and the TDD check's line. When a task in the wave has `Security: yes`, dispatch in the same message one more `reviewer` in SECURITY mode over the same range and briefs: this wave's code is where an auth, payment or input flaw is cheapest to fix. Its P0 and P1 findings enter the fix loop.
 7. **Fix loop**, for P0 and P1 findings, a TDD check `FAIL` included. P2 and P3 go to the ledger as `deferred` for step 3.
@@ -106,13 +122,14 @@ An empty frontier with tasks still unintegrated means those tasks are parked: go
 
 1. **Gate and checks.** One `runner` runs `Gate` on the final tip, unless step 2 already ran it on that exact SHA. Then run the leftover scan, and the graph brief `diff` with `<from>` = BASE to write the whole build's IMPACT. Every wave's TDD check already ran in step 2.
 2. **QA**, when the Contract's `QA` is not none: one `reviewer` QA dispatch with BASE as the fixed point and the spec path. Each fail goes to one `coder` dispatch as findings, then a follow-up QA dispatch that carries the prior report. Two rounds at most; a fail that survives is parked.
-3. **Security**, when the Contract's `Security review` is yes: one `reviewer` SECURITY dispatch with BASE, the tip and the spec path.
-4. **Review.** Call the Skill tool with the Contract's `Review skill`, giving it BASE as the fixed point and `PLAN/spec.md` as the spec. Its readers and validators are `reviewer` agents, and every reader prompt you write names the whole build's IMPACT file as the list of untouched callers to check. When `Peer` is none, there is no peer. The spec path replaces any issue-tracker lookup.
-5. **Fix once.** Every verified P0 to P2 finding from the scan, the security review and the review, and every `deferred` ledger line, goes into ONE `coder` dispatch. Then one `runner` gate, the leftover scan and the TDD check from the last reviewed commit, and one follow-up review of the fix range. What is still open is parked with a ruling: there is no second fix wave. A secret the scan found in a commit is parked as P0 even after its line is removed, because it stays in the branch history: say so, and that the secret must be rotated.
+3. **Acceptance** (the user's demands). When `PLAN/request.md` exists, one `reviewer` ACCEPTANCE dispatch with request.md, decisions.md, BASE and the tip; write its summary line as `acceptance:`. PARTIAL and NOT MET items join the fix-once dispatch (step 6), and one ACCEPTANCE re-check of those items follows it. With no `request.md`, skip this step with a Ruling.
+4. **Security**, when the Contract's `Security review` is yes: one `reviewer` SECURITY dispatch with BASE, the tip and the spec path.
+5. **Review.** Call the Skill tool with the Contract's `Review skill`, giving it BASE as the fixed point and `PLAN/spec.md` as the spec. Its readers and validators are `reviewer` agents, and every reader prompt you write names the whole build's IMPACT file as the list of untouched callers to check. When `Peer` is none, there is no peer. The spec path replaces any issue-tracker lookup.
+6. **Fix once.** Every verified P0 to P2 finding from the scan, the security review and the review, every PARTIAL and NOT MET acceptance item, and every `deferred` ledger line, goes into ONE `coder` dispatch. Then one `runner` gate, the leftover scan and the TDD check from the last reviewed commit, one follow-up review of the fix range, and the ACCEPTANCE re-check. What is still open is parked with a ruling: there is no second fix wave. A secret the scan found in a commit is parked as P0 even after its line is removed, because it stays in the branch history: say so, and that the secret must be rotated.
 
 ## 4. Finish
 
-1. Call the Skill tool with `supermatt:pr` (`pr` when unavailable) and write the body to `RUN/pr-body.md`. After its sections add **Rulings** (every `Ruling:` ledger line, in order), **Parked and deferred**, **Waiting for a human** (every `handoff` line), and the scan, QA, security and review verdict lines.
+1. Call the Skill tool with `supermatt:pr` (`pr` when unavailable) and write the body to `RUN/pr-body.md`. After its sections add **Rulings** (every `Ruling:` ledger line, in order), **Parked and deferred**, **Waiting for a human** (every `handoff` line), and the scan, QA, security and review verdict lines. Add **Not done**: every acceptance item still unmet.
 2. When `git status --short graphify-out` shows changes, the repository tracks its graph: have the `runner` commit them as `chore: refresh code graph` before anything is pushed.
 3. Act on the Contract's `Finish`:
    - `branch`: leave the integration branch as it is.
@@ -125,8 +142,11 @@ An empty frontier with tasks still unintegrated means those tasks are parked: go
    - `machine`: true of this computer, its tools, an installed skill, or this pipeline's own procedure, in every project.
 
    The script merges a lesson into one that already says the same, promotes a `repo` lesson that a second project reports, and keeps the store within its caps. Run `drop` for a lesson this run proved wrong. A run with no avoidable friction adds nothing.
-5. Your final message, in this order: `OUTCOME:` in one line; the pull request URL or branch; tasks integrated and tasks parked; the TDD, scan, QA, security and review verdict lines; **Rulings I made**, exhaustive and in order, each with what it costs if wrong; parked and deferred findings; **Waiting for you** (every `handoff` line); what was not verified and why; **Friction** (every `friction` line) and the lessons written. RUN stays in place as the record.
+5. **Retro.** Run `node "<scripts>/retro.mjs" RUN`. When it prints a proposal path, dispatch `senior` to write the `## Patch` diff in that proposal against `${CLAUDE_PLUGIN_ROOT}` (paths relative to the plugin root), leaving the proposal uncommitted. Name the path and `/autopilot:improve` in the final message.
+6. Your final message, in this order: `OUTCOME:` in one line; the pull request URL or branch; tasks integrated and tasks parked; the TDD, scan, QA, security and review verdict lines; **Rulings I made**, exhaustive and in order, each with what it costs if wrong; parked and deferred findings; **Not done**; **Waiting for you** (every `handoff` line); what was not verified and why; **Friction** (every `friction` line) and the lessons written. RUN stays in place as the record.
 
 ## Stops
 
 Four things end the run early, and only these: a failed preflight; an action that would be destructive or irreversible beyond this run's own branches; a credential or secret the run needs and does not have; a plan so broken that every path forward is a guess. For a Stop, your final message starts `STOP:` with the reason, then the ledger path and the one decision you need. Everything else is a ruling.
+
+PAUSED (step 2.3) is a way a turn ends besides these four. It is not a Stop, and a fresh conductor resumes it from the ledger.
