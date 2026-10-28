@@ -18,13 +18,15 @@ const MAX_READ = 1024;
 
 const validPlan = (name) => typeof name === "string" && PLAN_NAME.test(name) && !name.includes("..");
 
-export function sanitize(reason) {
+// The text reaches a model and, through it, a shell line: only a plain allowlist survives.
+export function sanitize(reason, max = MAX_REASON) {
   return String(reason ?? "")
     // eslint-disable-next-line no-control-regex
     .replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g, " ")
+    .replace(/[^A-Za-z0-9 ._:,()/-]/g, " ")
     .replace(/ {2,}/g, " ")
     .trim()
-    .slice(0, MAX_REASON);
+    .slice(0, max);
 }
 
 export function runsDir(cwd = process.cwd()) {
@@ -34,7 +36,7 @@ export function runsDir(cwd = process.cwd()) {
   return join(root, ".autopilot", "runs");
 }
 
-function readReason(file) {
+export function readReason(file) {
   let fd;
   try {
     if (!lstatSync(file).isFile()) return null;
@@ -116,6 +118,16 @@ function writeFlag(dir, file, reason) {
   }
 }
 
+// clear makes the same directory checks as set, and only removes a regular file.
+function clearFlag(dir, file) {
+  for (const p of [dirname(dirname(dir)), dirname(dir), dir]) if (!realDir(p)) return false;
+  try {
+    return !existsSync(file) || lstatSync(file).isFile();
+  } catch {
+    return false;
+  }
+}
+
 function cli(args) {
   const [cmd, plan, ...rest] = args;
   const say = (s) => console.log(s);
@@ -141,6 +153,8 @@ function cli(args) {
       return 0;
     }
     say(`paused: ${plan}: ${reason}`);
+  } else if (!clearFlag(dir, file)) {
+    say(`pause: refused plan name "${plan}"`);
   } else if (existsSync(file)) {
     rmSync(file, { force: true });
     say(`resumed: ${plan}`);
