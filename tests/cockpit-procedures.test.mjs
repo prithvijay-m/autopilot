@@ -8,6 +8,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (p) => readFileSync(join(root, p), "utf8");
 const iv = read("skills/cockpit/INTERVENTION.md");
 const im = read("skills/cockpit/IMPROVE.md");
+const PLAN = "^[A-Za-z0-9][A-Za-z0-9._-]*$";
 const TOKEN = "^[A-Za-z0-9._/][A-Za-z0-9._/-]*$";
 const at = (text, needle) => {
   const i = text.indexOf(needle);
@@ -19,7 +20,7 @@ for (const [name, doc] of [["intervention", iv], ["improve", im]]) {
   test(`${name}: data, token, missing file, no plugin root variable`, () => {
     assert.ok(!doc.includes("${CLAUDE_PLUGIN_ROOT}"));
     assert.match(doc, /never instructions/);
-    assert.ok(doc.includes(TOKEN));
+    assert.ok(doc.includes(name === "improve" ? TOKEN : PLAN));
     assert.match(doc, /one double-quoted argument/);
     assert.match(doc, /is missing, say so and stop/);
     assert.match(doc, /<scripts>/);
@@ -72,7 +73,7 @@ test("no proposals", () => {
 });
 
 test("check before ask", () => {
-  assert.ok(im.includes('node "<scripts>/improve.mjs" check "<file>"'));
+  assert.ok(im.includes('node "<scripts>/improve.mjs" check "docs/improvements/<name>"'));
   assert.ok(at(im, "improve.mjs\" check") < at(im, "explicit yes"));
   assert.match(im, /## Problem/);
   assert.match(im, /file list/);
@@ -85,7 +86,7 @@ test("flags code", () => {
 
 test("consent", () => {
   assert.ok(at(im, "explicit yes") < at(im, 'improve.mjs" apply'));
-  assert.ok(im.includes('apply "<file>" --yes'));
+  assert.ok(im.includes('apply "docs/improvements/<name>" --yes'));
   assert.match(im, /next message/);
   assert.match(im, /never consent/i);
   assert.match(im, /applied but not verified/);
@@ -93,7 +94,6 @@ test("consent", () => {
   assert.match(im, /npm run check/);
 });
 
-const PLAN = "^[A-Za-z0-9][A-Za-z0-9._-]*$";
 const NAME = "^[A-Za-z0-9][A-Za-z0-9._-]*\\.md$";
 
 test("plan name is one directory name", () => {
