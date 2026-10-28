@@ -52,7 +52,8 @@ test("user line", () => {
 });
 
 test("resume hint", () => {
-  assert.ok(iv.trimEnd().split("\n").pop().includes("Resume with /autopilot:resume."));
+  const last = iv.split("\n").filter((l) => /^\d+\. /.test(l)).pop();
+  assert.ok(last.startsWith("6. End with") && last.includes("Resume with /autopilot:resume."));
   assert.ok(at(iv, "Answer what the user asked") < at(iv, "Resume with /autopilot:resume."));
 });
 
