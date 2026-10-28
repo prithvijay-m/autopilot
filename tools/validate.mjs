@@ -119,6 +119,23 @@ export function validate(root) {
     }
   }
 
+  // commands
+  const commandDir = join(root, "commands");
+  if (existsSync(commandDir)) {
+    for (const f of readdirSync(commandDir).filter((n) => n.endsWith(".md"))) {
+      const file = `commands/${f}`;
+      const name = basename(f, ".md");
+      const text = read(join(commandDir, f));
+      const fm = frontmatter(text);
+      if (!fm) err(file, "no frontmatter");
+      else if (!fm.description) err(file, "no description");
+      if (existsSync(join(skillDir, name))) err(file, `"${name}" is already a skill, and a skill is its own command`);
+      if (plugin && !new RegExp(`\`${plugin.name}:[a-z<][a-z<>-]*\``).test(text)) {
+        err(file, "routes to nothing: name an agent or skill of this plugin as <plugin>:<name> in backticks");
+      }
+    }
+  }
+
   // hooks
   const hooksFile = join(root, "hooks", "hooks.json");
   if (existsSync(hooksFile)) {
