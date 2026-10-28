@@ -84,3 +84,36 @@ test("plugin root and validate", () => {
   const { errors } = validate(root);
   assert.deepEqual(errors, []);
 });
+
+test("upstream anchor", () => {
+  assert.match(agent, /never take the upstream from a search result/i);
+  assert.match(agent, /registry[^\n]*pointer/i);
+  assert.match(agent, /leaves the project's own host or GitHub org/i);
+  assert.match(agent, /`https`/);
+});
+
+test("same-package rule", () => {
+  assert.match(agent, /install command must name exactly the package/i);
+  assert.match(agent, /manifest's spelling/i);
+});
+
+test("conductor pre-display check", () => {
+  assert.match(proc, /before (it )?show(s|ing)/i);
+  assert.match(proc, /not `https`/);
+  assert.match(proc, /exact package or tool name/);
+  assert.match(proc, /`\|` escaped|escape `\|`/);
+  assert.match(proc, /latest[^\n]*claim to verify/i);
+});
+
+test("metacharacter warning", () => {
+  assert.ok(proc.includes("runs a remote script or several commands: read it first"));
+  for (const m of ["`|`", "`;`", "`&&`", "`$(`", "`>`"]) assert.ok(proc.includes(m), m);
+});
+
+test("read scope and no local content in requests", () => {
+  assert.match(agent, /only on the manifest paths named in the dispatch/i);
+  assert.match(agent, /`\.env\*`/);
+  assert.match(agent, /outside the (repository )?root/i);
+  assert.match(agent, /WebFetch[^\n]*only/i);
+  assert.match(agent, /never contains anything read from a local file except the package name and the version in use/i);
+});
