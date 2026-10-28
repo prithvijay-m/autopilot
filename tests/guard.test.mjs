@@ -234,22 +234,33 @@ test("runActive: an unfinished run counts, a finished or stale one does not", ()
     const sub = join(root, "src", "deep");
     mkdirSync(sub, { recursive: true });
     assert.equal(runActive(sub), false, "no .autopilot");
-    mkdirSync(join(ap, "plan"), { recursive: true });
+    mkdirSync(join(ap, "runs", "plan"), { recursive: true });
     assert.equal(runActive(sub), false, "empty .autopilot");
     writeFileSync(join(ap, "state.json"), JSON.stringify({ phase: "build" }));
     assert.equal(runActive(sub), true, "state in build");
     writeFileSync(join(ap, "state.json"), JSON.stringify({ phase: "done" }));
     assert.equal(runActive(sub), false, "state done");
-    writeFileSync(join(ap, "plan", "ledger.md"), "task 1 done\n");
+    writeFileSync(join(ap, "runs", "plan", "ledger.md"), "task 1 done\n");
     assert.equal(runActive(sub), true, "ledger without a finish line");
-    writeFileSync(join(ap, "plan", "ledger.md"), "task 1 done\nfinish: https://example.test/pr/1\n");
+    writeFileSync(join(ap, "runs", "plan", "ledger.md"), "task 1 done\nfinish: https://example.test/pr/1\n");
     assert.equal(runActive(sub), false, "ledger with finish");
-    writeFileSync(join(ap, "plan", "ledger.md"), "STOP: no credentials\n");
+    writeFileSync(join(ap, "runs", "plan", "ledger.md"), "STOP: no credentials\n");
     assert.equal(runActive(sub), false, "ledger with STOP");
-    writeFileSync(join(ap, "plan", "ledger.md"), "task 1 done\n");
+    writeFileSync(join(ap, "runs", "plan", "ledger.md"), "task 1 done\n");
     const old = new Date(Date.now() - 72 * 3600 * 1000);
-    utimesSync(join(ap, "plan", "ledger.md"), old, old);
+    utimesSync(join(ap, "runs", "plan", "ledger.md"), old, old);
     assert.equal(runActive(sub), false, "stale ledger");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("runActive: old path is not a run", () => {
+  const root = mkdtempSync(join(tmpdir(), "guard-run-"));
+  try {
+    mkdirSync(join(root, ".autopilot", "plan"), { recursive: true });
+    writeFileSync(join(root, ".autopilot", "plan", "ledger.md"), "task 1 done\n");
+    assert.equal(runActive(root), false, "a ledger directly under .autopilot is not this plugin's run");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
