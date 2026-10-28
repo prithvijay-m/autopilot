@@ -2,7 +2,9 @@ import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readFileSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { allowedPath, extractPatch, patchPaths, pluginRoot } from "../scripts/improve.mjs";
+import * as mod from "../scripts/improve.mjs";
+
+const { allowedPath, extractPatch, patchPaths, pluginRoot } = mod;
 import { node, tempDir, tempRepo } from "./helpers.mjs";
 
 const cleanups = [];
@@ -120,7 +122,9 @@ test("outside refused", () => {
 test("unprefixed path refused", () => {
   const r = plugin();
   const f = put(r, "p.md", prop("--- scripts/a.mjs\n+++ scripts/a.mjs\n@@ -1 +1 @@\n-one\n+x\n"));
-  assert.equal(run(r, ["check", f]).status, 1);
+  const o = run(r, ["check", f]);
+  assert.equal(o.status, 1);
+  assert.equal(o.out, "refused: patch paths must use the a/ and b/ prefixes");
 });
 
 test("symlink and binary refused", () => {
@@ -259,5 +263,44 @@ test("root inside a larger repository refused", () => {
   const o = improve(outer.dir, ["apply", f, "--yes", "--root", root]);
   assert.equal(o.status, 1, o.out);
   assert.doesNotMatch(o.out, /^applied/m);
+  assert.match(readFileSync(f, "utf8"), /^Status: proposed$/m);
+});
+
+const MIX =
+  "diff --git a/hooks/a.sh b/hooks/a.sh\n--- a/hooks/a.sh\n+++ b/hooks/a.sh\n@@ -1 +1 @@\n-echo hi\n+pwn\n" +
+  "diff --git a/hooks/a.sh b/hooks/c.sh\nsimilarity index 100%\nrename from hooks/a.sh\nrename to hooks/c.sh\n";
+
+test("same path in two sections refused before any write", () => {
+  const r = plugin({ "hooks/a.sh": "echo hi\n" });
+  const f = put(r, "p.md", prop(MIX));
+  for (const args of [["check", f], ["apply", f, "--yes"]]) {
+    const o = run(r, args);
+    assert.equal(o.status, 1, o.out);
+    assert.equal(o.out, "refused: path named in more than one section hooks/a.sh");
+  }
+  assert.equal(readFileSync(join(r.dir, "hooks", "a.sh"), "utf8"), "echo hi\n");
+  assert.equal(existsSync(join(r.dir, "hooks", "c.sh")), false);
+  assert.equal(r.git("status", "--porcelain", "--", "hooks").out, "");
+  assert.match(readFileSync(f, "utf8"), /^Status: proposed$/m);
+});
+
+test("verification failure after a successful apply is reported as applied but not verified", () => {
+  const r = plugin();
+  const f = put(r, "p.md", prop(EDIT));
+  const lines = [];
+  const log = console.log;
+  console.log = (...a) => lines.push(a.join(" "));
+  let code;
+  try {
+    code = mod.main(["apply", f, "--yes", "--root", r.dir], { verify: () => false });
+  } finally {
+    console.log = log;
+  }
+  const out = lines.join("\n");
+  assert.equal(code, 1);
+  assert.doesNotMatch(out, /^does not apply/m);
+  assert.doesNotMatch(out, /^applied:/m);
+  assert.equal(out, "applied but not verified: scripts/a.mjs changed; review with git diff");
+  assert.equal(readFileSync(join(r.dir, "scripts", "a.mjs"), "utf8"), "uno\ntwo\n");
   assert.match(readFileSync(f, "utf8"), /^Status: proposed$/m);
 });
