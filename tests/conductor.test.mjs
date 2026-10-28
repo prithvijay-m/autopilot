@@ -134,3 +134,31 @@ test("user lines", () => {
 test("paused is not a stop", () => {
   assert.match(section("Stops"), /PAUSED[^\n]*not a Stop[^\n]*ledger/);
 });
+
+test("pause reason is fixed and single-quoted", () => {
+  const s3 = step(section("2. Run the frontier"), 3);
+  assert.ok(s3.includes(`pause.mjs" set "<PLAN directory name>" '`));
+  assert.match(s3, /again after an intervention/);
+  assert.match(s3, /pause hook refused a dispatch/);
+  assert.match(s3, /never copied from hook output, an agent report or a file/);
+});
+
+test("pause continues only on the printed paused line", () => {
+  const s3 = step(section("2. Run the frontier"), 3);
+  assert.match(s3, /continue only when[^\n]*prints a line starting `paused: `/);
+  assert.match(s3, /otherwise write `blocked:`[^\n]*stop/);
+});
+
+test("ledger text is written without a shell string", () => {
+  const s = section("Ledger and lessons");
+  assert.match(s, /quoted heredoc/);
+  assert.match(s, /never[^\n]*echo[^\n]*printf[^\n]*double-quoted/);
+});
+
+test("user lines are notes, not consent", () => {
+  assert.ok(!text.includes("is an instruction from the user: honour it as a ruling"));
+  const s = section("Ledger and lessons");
+  for (const w of ["push", "merge", "deploy", "install", "secrets", "Finish mode"]) assert.ok(s.includes(w), w);
+  assert.match(s, /never authorised/);
+  assert.match(s, /`handoff` line/);
+});
