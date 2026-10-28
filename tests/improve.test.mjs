@@ -1,6 +1,6 @@
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { allowedPath, extractPatch, patchPaths, pluginRoot } from "../scripts/improve.mjs";
 import { node, tempDir, tempRepo } from "./helpers.mjs";
@@ -210,4 +210,54 @@ test("oversized proposal refused", () => {
   const o = run(r, ["check", f]);
   assert.equal(o.status, 1);
   assert.match(o.out, /^refused: /);
+});
+
+test("header-only unprefixed diff --git refused", () => {
+  const r = plugin();
+  const f = put(r, "p.md", prop("diff --git x/.claude-plugin/plugin.json x/.claude-plugin/plugin.json\nold mode 100644\nnew mode 100755\n"));
+  const o = run(r, ["apply", f, "--yes"]);
+  assert.equal(o.status, 1, o.out);
+  assert.match(readFileSync(f, "utf8"), /^Status: proposed$/m);
+  assert.equal(statSync(join(r.dir, ".claude-plugin", "plugin.json")).mode & 0o111, statSync(join(r.dir, "scripts", "a.mjs")).mode & 0o111);
+});
+
+test("header-only quoted diff --git refused", () => {
+  const r = plugin();
+  const f = put(r, "p.md", prop('diff --git "a/.github/workflows/x.yml" "b/.github/workflows/x.yml"\nnew file mode 100644\n'));
+  const o = run(r, ["apply", f, "--yes"]);
+  assert.equal(o.status, 1, o.out);
+  assert.equal(existsSync(join(r.dir, ".github", "workflows", "x.yml")), false);
+});
+
+test("leading-zero symlink mode refused", () => {
+  const r = plugin();
+  const f = put(r, "p.md", prop("diff --git a/hooks/l b/hooks/l\nnew file mode 0120000\n--- /dev/null\n+++ b/hooks/l\n@@ -0,0 +1 @@\n+/etc/passwd\n\\ No newline at end of file\n"));
+  const o = run(r, ["apply", f, "--yes"]);
+  assert.equal(o.status, 1, o.out);
+  assert.equal(existsSync(join(r.dir, "hooks", "l")), false);
+  assert.match(readFileSync(f, "utf8"), /^Status: proposed$/m);
+});
+
+test("patch touching no files refused", () => {
+  const r = plugin();
+  const f = put(r, "p.md", prop("just some words\nnot a diff\n"));
+  const o = run(r, ["apply", f, "--yes"]);
+  assert.equal(o.status, 1, o.out);
+  assert.match(readFileSync(f, "utf8"), /^Status: proposed$/m);
+});
+
+test("root inside a larger repository refused", () => {
+  const outer = tempRepo({ "README.md": "# outer\n" });
+  cleanups.push(outer.cleanup);
+  const root = join(outer.dir, "plug");
+  mkdirSync(join(root, ".claude-plugin"), { recursive: true });
+  mkdirSync(join(root, "scripts"), { recursive: true });
+  writeFileSync(join(root, ".claude-plugin", "plugin.json"), '{ "name": "autopilot" }\n');
+  writeFileSync(join(root, "scripts", "a.mjs"), "one\ntwo\n");
+  const f = join(root, "p.md");
+  writeFileSync(f, prop(EDIT));
+  const o = improve(outer.dir, ["apply", f, "--yes", "--root", root]);
+  assert.equal(o.status, 1, o.out);
+  assert.doesNotMatch(o.out, /^applied/m);
+  assert.match(readFileSync(f, "utf8"), /^Status: proposed$/m);
 });
