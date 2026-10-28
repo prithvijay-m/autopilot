@@ -1,5 +1,44 @@
 # Changelog
 
+## 0.3.0
+
+A build started on 0.2.x keeps its ledger at the old path: finish it on 0.2.x.
+
+**Rename and install**
+- The plugin and repository are now named `autopilot` (they were `autopilot-forge` and `claude-code-forge`). Install with `/plugin marketplace add prithvijay-m/autopilot` and `/plugin install autopilot@autopilot`. Agents are dispatched as `autopilot:<agent>`. There is no alias for the old name.
+- Run state moved to `.autopilot/runs/<plan>/`, and the rendered lessons to `.autopilot/runs/LESSONS.md`. The plugin writes nowhere else under `.autopilot/`, so a same-named local pipeline is left alone. `lessons.mjs sync` no longer imports a hand-kept `.autopilot/LESSONS.md` (`lessons.mjs import <file>` still does).
+
+**Commands**
+- Fifteen `/autopilot:` commands: blueprint, build, intervention, resume, merge, test, deploy, verify, status, agent, preview, scout, improve, recon, copilot. Twelve are thin files in `commands/`; blueprint, recon and verify are the skills. A new `cockpit` skill holds the procedures behind intervention, preview, copilot, scout and improve.
+- A plan's Contract may name a `Deploy` command; `/autopilot:deploy` runs it only then.
+
+**Voice and status**
+- Messages you read are in a short pilot voice (`skills/autopilot/VOICE.md`); briefs, code, commits and ledger lines stay plain. Checkpoints and outcomes carry a pinned mission line, `Mission <n> of <m> tasks completed.`, with up to three bullets.
+
+**Host sizing**
+- `host-load.mjs` counts the limits of a cgroup v2 container and reserves memory; the conductor sizes each wave to it.
+
+**Interventions and pause**
+- `/autopilot:intervention` holds a run and records your instruction in the ledger. A `PAUSE` file under `.autopilot/runs/<plan>/` (managed by `scripts/pause.mjs`) makes a PreToolUse hook on `Agent|Task` refuse the build crew at the next boundary; the conductor also sets it when a task is stuck again after an intervention. `/autopilot:resume` clears it. The session-start hint names a paused run.
+
+**Acceptance**
+- When a plan has a `request.md`, the final review includes an ACCEPTANCE check of the user's demands against the built branch; partial and unmet items join the single fix pass.
+
+**Copilots**
+- A large plan of independent parts is split among copilot conductors, each with its own ledger (`.autopilot/runs/<plan>-c<N>/`) and branch (`scripts/copilots.mjs`). They depend on a conductor being able to dispatch conductors, which worked on Claude Code 2.1.312 (`docs/spikes/nested-dispatch.md`). `/autopilot:copilot` shows the split.
+
+**Preview**
+- The planner writes a clickable `preview/index.html`; `/autopilot:preview` publishes it and revises it until you give the green light, before the build starts.
+
+**Retro and improve**
+- `scripts/retro.mjs` writes a proposal to `docs/improvements/` when the same problem repeated in a run, and a senior agent drafts the patch. `/autopilot:improve` checks and applies it only after your explicit yes (`scripts/improve.mjs` validates every path first).
+
+**Scout**
+- New `scout` agent and `/autopilot:scout`: lists notable releases for your stack, each with its upstream link and upgrade command as a claim to verify. It alerts only and never installs.
+
+**Validate**
+- `tools/validate.mjs` rejects the old plugin and repository names everywhere except this changelog, and checks that scoped names in prose name a real agent or skill.
+
 ## 0.2.2
 
 **Token savings** (details and measurements in `docs/token-usage.md`)
