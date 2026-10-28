@@ -30,6 +30,7 @@ const GOOD = {
   ".claude-plugin/plugin.json": { name: "demo-plugin", version: "1.0.0", description: "d" },
   "agents/a.md": "---\nname: a\ndescription: d\nmodel: sonnet\n---\nbody ${CLAUDE_PLUGIN_ROOT}/scripts/x.mjs\n",
   "skills/s/SKILL.md": "---\nname: s\ndescription: d\n---\nuse `demo-plugin:a`\n",
+  "commands/go.md": "---\ndescription: d\n---\nHand $ARGUMENTS to `demo-plugin:a`.\n",
   "scripts/x.mjs": "",
   "hooks/hooks.json": { hooks: { PreToolUse: [{ hooks: [{ type: "command", command: 'node "${CLAUDE_PLUGIN_ROOT}/scripts/x.mjs"' }] }] } },
 };
@@ -56,6 +57,12 @@ test("each known mistake is an error", () => {
     ["a broken link", { "skills/s/NOTES.md": "see [x](missing.md)" }, /goes nowhere/],
     ["a script that does not exist", { "skills/s/NOTES.md": "run <scripts>/nope.mjs" }, /does not exist/],
     ["a scoped agent that does not exist", { "skills/s/NOTES.md": "dispatch `demo-plugin:ghost`" }, /neither an agent nor a skill/],
+    ["a command without frontmatter", { "commands/go.md": "Hand it to `demo-plugin:a`.\n" }, /commands\/go\.md: no frontmatter/],
+    ["a command without a description", { "commands/go.md": "---\nname: go\n---\nHand it to `demo-plugin:a`.\n" }, /commands\/go\.md: no description/],
+    ["a command that shadows a skill", { "commands/s.md": "---\ndescription: d\n---\nHand it to `demo-plugin:a`.\n" }, /"s" is already a skill, and a skill is its own command/],
+    ["a command that routes to nothing", { "commands/go.md": "---\ndescription: d\n---\nDo the thing.\n" }, /routes to nothing: name an agent or skill of this plugin as <plugin>:<name> in backticks/],
+    ["a command routing to a missing agent", { "commands/go.md": "---\ndescription: d\n---\nHand it to `demo-plugin:ghost`.\n" }, /neither an agent nor a skill/],
+    ["the plugin root in a command", { "commands/go.md": "---\ndescription: d\n---\nRun `demo-plugin:a` with ${CLAUDE_PLUGIN_ROOT}/scripts/x.mjs\n" }, /never replaced/],
   ];
   for (const [name, patch, re] of cases) {
     const t = fixture({ ...GOOD, ...patch });
