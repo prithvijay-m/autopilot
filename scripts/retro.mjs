@@ -6,10 +6,11 @@
 //   node retro.mjs <RUN> [--out <repo root>] [--date YYYY-MM-DD]
 //
 // Prints `retro: none`, `retro: <n> repeated problems -> <path>` or `retro: no ledger at <path>`.
-import { existsSync, lstatSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { lstatSync, mkdirSync, writeFileSync } from "node:fs";
+import { basename, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { applicable, detectStack, load, projectRoot } from "./lessons.mjs";
+import { readRepoFile, validName } from "./repo-read.mjs";
 
 const CUT = 200;
 const cut = (s) => (s.length > CUT ? s.slice(0, CUT) : s);
@@ -31,7 +32,12 @@ export function problems({ ledger = "", lessons = [] }) {
   return out;
 }
 
-const slugOf = (plan) => fwd(plan).replace(/\/+$/, "").split("/").pop().replace(/^\d{4}-\d{2}-\d{2}-/, "");
+// The slug names a file: the plan name when it is a valid directory name, else the run directory, else "run".
+const slugOf = (plan, run = "") => {
+  const name = fwd(plan).replace(/\/+$/, "").split("/").pop();
+  const base = validName(name) ? name : validName(basename(run)) ? basename(run) : "run";
+  return base.replace(/^\d{4}-\d{2}-\d{2}-/, "");
+};
 
 const summary = (p) => {
   const first = cut(p.evidence[0]).replace(/\s+/g, " ").trim();
@@ -44,7 +50,7 @@ const summary = (p) => {
 export function proposal({ plan, run, date, problems: ps }) {
   const evidence = ps.flatMap((p) => p.evidence).map((e) => `- \`${cut(e).replace(/`/g, "'")}\``);
   return [
-    `# Improvement: ${slugOf(plan)}`,
+    `# Improvement: ${slugOf(plan, run)}`,
     "Status: proposed",
     `Run: ${fwd(run)}`,
     `Date: ${date}`,
@@ -94,15 +100,15 @@ function main(args) {
   };
   const run = resolve(args.find((a, i) => !a.startsWith("--") && !(i > 0 && args[i - 1].startsWith("--"))) ?? ".");
   const ledgerFile = join(run, "ledger.md");
-  if (!existsSync(ledgerFile)) return console.log(`retro: no ledger at ${fwd(ledgerFile)}`);
-  const ledger = readFileSync(ledgerFile, "utf8");
+  const ledger = readRepoFile(ledgerFile);
+  if (ledger === null) return console.log(`retro: no ledger at ${fwd(ledgerFile)}`);
   const root = resolve(flag("--out") ?? projectRoot());
   const date = flag("--date") ?? new Date().toISOString().slice(0, 10);
   const a = applicable(load(), projectRoot(root), detectStack(root));
   const ps = problems({ ledger, lessons: [...a.repo, ...a.stack, ...a.machine] });
   if (!ps.length) return console.log("retro: none");
   const plan = /^# autopilot ledger:\s*(.+)$/m.exec(ledger)?.[1].trim() ?? run;
-  const file = proposalPath(root, date, slugOf(plan));
+  const file = proposalPath(root, date, slugOf(plan, run));
   const dir = join(root, "docs", "improvements");
   const refuse = () => console.log(`retro: refused (a link in the path of ${fwd(file)}); nothing written`);
   if (![join(root, "docs"), dir].every(realDir)) return refuse();

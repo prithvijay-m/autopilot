@@ -8,10 +8,11 @@
 // The conductor runs `start` at dispatch and `check` when the report arrives, then applies the remedy and logs
 // `intervene: task NN <signal> -> <remedy>`. A second trip after that line pauses the run instead.
 import { spawnSync } from "node:child_process";
-import { existsSync, lstatSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { similarity } from "./lessons.mjs";
+import { readRepoFile, sanitize } from "./repo-read.mjs";
 
 const VERDICT = /\b(DONE_WITH_CONCERNS|DONE|BLOCKED|READY|APPROVE|CHANGES|PASS|FAIL)\b/;
 const MISSING = /not found|missing|no such|cannot find|unknown|which file|where is/i;
@@ -123,10 +124,11 @@ export function decide({ ledger = "", task, found }) {
   if (new RegExp(`intervene: task ${esc(task)}\\b`).test(ledger)) {
     return [`PAUSE task ${task}: ${found[0].signal} again after an intervention`];
   }
-  return found.map((f) => `${f.signal} task ${task}: ${f.evidence} -> ${f.remedy}`);
+  // The evidence quotes ledger and report text: it is data, so only the plain allowlist survives.
+  return found.map((f) => `${f.signal} task ${task}: ${sanitize(f.evidence, 200)} -> ${f.remedy}`);
 }
 
-const read = (p) => (p && existsSync(p) ? readFileSync(p, "utf8") : undefined);
+const read = (p) => (p ? (readRepoFile(p) ?? undefined) : undefined);
 const readJson = (p) => {
   try {
     return JSON.parse(read(p) ?? "{}");
