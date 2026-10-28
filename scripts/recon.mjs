@@ -25,7 +25,7 @@ function main(argv) {
   const file = join(dir, "rea.mcp.json");
   writeFileSync(file, JSON.stringify(config()));
   try {
-    const prompt = ["/autopilot-forge:recon", ...argv].join(" ");
+    const prompt = ["/autopilot:recon", ...argv].join(" ");
     const r = spawnSync("claude", ["--mcp-config", file, prompt], { stdio: "inherit", shell: process.platform === "win32" });
     if (r.error) {
       console.error(`recon: could not start claude (${r.error.message})`);

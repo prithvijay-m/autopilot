@@ -6,7 +6,7 @@ argument-hint: "[what you want built, or a plan directory]"
 
 # Autopilot
 
-Agents of this plugin are dispatched by their scoped name, `autopilot-forge:<agent>` (`autopilot-forge:planner`, `autopilot-forge:coder`), so a same-named agent of the user's cannot shadow them. The bare names in this file are shorthand for those.
+Agents of this plugin are dispatched by their scoped name, `autopilot:<agent>` (`autopilot:planner`, `autopilot:coder`), so a same-named agent of the user's cannot shadow them. The bare names in this file are shorthand for those.
 
 **Plugin root:** `${CLAUDE_PLUGIN_ROOT}`. A file you open with the Read tool shows the variable name `CLAUDE_PLUGIN_ROOT` unreplaced, as in `blueprint/SKILL.md` and `GRAPH.md`: it stands for this path, and so does `<scripts>` for its `scripts/` directory.
 

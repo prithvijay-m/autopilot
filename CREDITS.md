@@ -1,6 +1,6 @@
 # Credits
 
-claude-code-forge is original work, but it stands on ideas and tools from the
+autopilot is original work, but it stands on ideas and tools from the
 Claude Code community. The forge does not vendor anyone else's skills; it calls
 them when installed and credits them here.
 

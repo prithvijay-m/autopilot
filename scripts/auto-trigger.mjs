@@ -20,7 +20,7 @@ const BUILD_OBJECT = /\b(app|application|website|web ?site|site|page|landing pag
 // Messages the harness delivers as prompts that no person typed.
 const MACHINE = /<task-notification>|\[Subagent hand-back\]|<agent-message|\[SYSTEM NOTIFICATION|<cross-session-message|<ci-monitor-event>|\[Artifact comment sent to Claude\]/;
 
-const DEFAULT_SKILL = "autopilot-forge:autopilot";
+const DEFAULT_SKILL = "autopilot:autopilot";
 
 /** The skill the nudge names: env var, then ~/.claude/autopilot-auto.skill, then the plugin's own. */
 export function targetSkill(env = process.env, home = homedir()) {

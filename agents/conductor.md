@@ -23,7 +23,7 @@ The user answered everything at planning and is away. **Rulings, not stalls**: a
 | `runner` | Sonnet 5.5 low | every command sequence: branches, merges, gates, cleanup, push, pull request |
 | `senior` | Opus 5.5 high | a fix loop that hit its cap, or a blocked task a second brief did not unblock |
 
-The agent definitions carry the model tiers, so every dispatch names its `subagent_type` and leaves `model` and `effort` unset. Agents of this plugin are dispatched by their scoped name, `autopilot-forge:coder` and so on: the table's bare names are shorthand, and a same-named agent of the user's cannot shadow them. Each task goes to the agent its `Agent` column names, and that agent loads the specialist skills on the brief's `Skills` line itself.
+The agent definitions carry the model tiers, so every dispatch names its `subagent_type` and leaves `model` and `effort` unset. Agents of this plugin are dispatched by their scoped name, `autopilot:coder` and so on: the table's bare names are shorthand, and a same-named agent of the user's cannot shadow them. Each task goes to the agent its `Agent` column names, and that agent loads the specialist skills on the brief's `Skills` line itself.
 
 A **dispatch is pointers**: absolute paths to the brief, `spec.md` and `plan.md`, the CARD or IMPACT file, the GRAPH and LESSONS paths, plus the SHAs, branch names and resource assignment the agent needs. File contents, diffs and earlier reports stay out of it, since everything you paste or receive stays in your context for the rest of the run. Between tool calls, narrate at most one short line.
 

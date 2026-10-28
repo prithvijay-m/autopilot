@@ -1,6 +1,6 @@
-# autopilot-forge
+# autopilot
 
-(The repository is `claude-code-forge`; the plugin is installed as `autopilot-forge`, because plugin names that start with `claude-` are reserved.)
+The plugin is `autopilot`.
 
 A [Claude Code](https://claude.com/claude-code) plugin with two tools:
 
@@ -42,8 +42,8 @@ The session model only drives light orchestration; the work is pinned per agent,
 ## Install
 
 ```
-/plugin marketplace add prithvijay-m/claude-code-forge
-/plugin install autopilot-forge@autopilot-forge
+/plugin marketplace add prithvijay-m/autopilot
+/plugin install autopilot@autopilot
 ```
 
 Then set your session permission mode to **Auto** before approving a plan, so the build runs unattended.
