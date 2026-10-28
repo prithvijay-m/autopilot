@@ -237,3 +237,16 @@ describe("pause hardening (verify round 1)", () => {
     assert.equal(readFileSync(target, "utf8"), "keep\n");
   });
 });
+
+describe("a linked run directory is never read", () => {
+  it("show lists no linked run, and the hook is not blocked by its PAUSE", { skip: process.platform === "win32" }, () => {
+    const r = repo();
+    const out = tempDir("forge-pause-out-");
+    cleanups.push(out.cleanup);
+    writeFileSync(join(out.dir, "PAUSE"), "outside\n");
+    mkdirSync(join(r.dir, ".autopilot", "runs"), { recursive: true });
+    symlinkSync(out.dir, join(r.dir, ".autopilot", "runs", "p"));
+    assert.equal(node(r.dir, "pause.mjs", ["show"]).out, "no paused run");
+    assert.equal(hook(r.dir, dispatch(scoped("coder"))).status, 0);
+  });
+});

@@ -126,3 +126,31 @@ test("CLI: a docs/improvements link creates nothing in its target directory", ()
   assert.match(o.out, /refused/);
   assert.deepEqual(readdirSync(outside), []);
 });
+
+test("CLI: a ledger link is not read", () => {
+  const r = repo();
+  const run = scratch();
+  const outside = scratch();
+  writeFileSync(join(outside, "l.md"), `${HEAD}intervene: task 1 a\nintervene: task 1 b\n`);
+  symlinkSync(join(outside, "l.md"), join(run, "ledger.md"));
+  const o = runCli([run, "--out", r.dir, "--date", "2026-10-28"]);
+  assert.match(o.out, /^retro: (no ledger at|none)/);
+  assert.ok(!existsSync(join(r.dir, "docs", "improvements")));
+});
+
+test("CLI: a hostile plan line never reaches the proposal file name", () => {
+  const r = repo();
+  const run = scratch();
+  writeFileSync(join(run, "ledger.md"), "# autopilot ledger: /x/a `id` $(id)\ntask 07: parked why\ntask 05: fix round 3/3\n");
+  const o = runCli([run, "--out", r.dir, "--date", "2026-10-28"]);
+  assert.match(o.out, /^retro: 2 repeated problems -> /);
+  const name = readdirSync(join(r.dir, "docs", "improvements"))[0];
+  assert.doesNotMatch(name, /[`$ ]/);
+  assert.doesNotMatch(o.out, /[`$]/);
+  assert.match(name, /^2026-10-28-forge-tmp-/, "falls back to the run directory name");
+  const bad = join(scratch(), "a b");
+  mkdirSync(bad);
+  writeFileSync(join(bad, "ledger.md"), "# autopilot ledger: /x/a `id`\ntask 07: parked why\ntask 05: fix round 3/3\n");
+  runCli([bad, "--out", r.dir, "--date", "2026-10-29"]);
+  assert.ok(readdirSync(join(r.dir, "docs", "improvements")).includes("2026-10-29-run.md"));
+});

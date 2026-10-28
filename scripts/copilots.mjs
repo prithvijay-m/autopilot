@@ -4,9 +4,9 @@
 //   node copilots.mjs <plan dir> <host lanes> [--ledger <ledger.md>] [--copilot] [--json]
 //
 // Prints `copilots: K (host lanes H, L lanes each) c1: 03,05 | c2: 04,06`, or `copilots: 0 (<reason>)`.
-import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
+import { readRepoFile } from "./repo-read.mjs";
 
 const clean = (s) => s.trim().replace(/[`{}]/g, "").replace(/\/+$/, "");
 
@@ -30,7 +30,7 @@ export function parsePlan(text) {
     if (/^:?-+:?$/.test(cells[0])) continue;
     const list = (c) => (cells[c] ?? "").split(",").map(clean).filter(Boolean);
     const deps = list(cols.deps).filter((d) => d.toLowerCase() !== "none");
-    out.push({ id: cells[cols.id], deps, touches: list(cols.touches) });
+    if (/^\d{1,4}$/.test(cells[cols.id] ?? "")) out.push({ id: cells[cols.id], deps, touches: list(cols.touches) });
   }
   return out;
 }
@@ -94,10 +94,11 @@ function main(argv) {
   };
   if (flag("--copilot")) return none("a copilot never spawns copilots");
   const file = join(dir, "plan.md");
-  if (!existsSync(file)) return none(`no plan.md at ${file}`);
+  const planText = readRepoFile(file);
+  if (planText === null) return none(`no plan.md at ${file}`);
   const hostLanes = Math.max(0, Math.floor(Number(lanesArg)) || 0);
-  const done = ledger && existsSync(ledger) ? integrated(readFileSync(ledger, "utf8")) : new Set();
-  const r = size({ groups: groups(parsePlan(readFileSync(file, "utf8")), done), hostLanes });
+  const done = integrated(ledger ? readRepoFile(ledger) : "");
+  const r = size({ groups: groups(parsePlan(planText), done), hostLanes });
   if (flag("--json")) return console.log(JSON.stringify(r));
   if (!r.copilots) return none("fewer than 2 independent groups of 3 or more tasks");
   const crews = r.crews.map((c, i) => `c${i + 1}: ${c.join(",")}`).join(" | ");
