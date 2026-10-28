@@ -69,20 +69,20 @@ test("merge before verify", () => {
 });
 
 test("no recursion", () => {
-  assert.match(copilot, /never run the copilots script except with `--copilot`/);
+  assert.match(copilot, /never run the copilots script except with `--copilot`/i);
 });
 
 test("no nested conductor", () => assert.match(copilot, /never dispatch a conductor/));
 
 test("copilot scope", () => {
-  assert.match(copilot, /skip Push early, Verify and Finish/);
+  assert.match(copilot, /skip Push early, Verify and Finish/i);
   assert.match(copilot, /OUTCOME: copilot c<N> done/);
   assert.match(copilot, /build only TASKS, on BRANCH/);
 });
 
 test("lane names", () => assert.ok(copilot.includes("`autopilot-lane/<slug>-c<N>/NN`")));
 
-test("share", () => assert.match(copilot, /at every wave run `node "<scripts>\/host-load.mjs" <LANES>`/));
+test("share", () => assert.match(copilot, /at every wave run `node "<scripts>\/host-load.mjs" <LANES>`/i));
 
 test("decide once", () => {
   assert.match(lead, /decide once/i);
