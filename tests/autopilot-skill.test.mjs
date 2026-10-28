@@ -13,7 +13,7 @@ const section = (n) => {
 };
 
 test("voice file named", () => {
-  assert.match(text, /user-facing messages[^\n]*\$\{CLAUDE_PLUGIN_ROOT\}\/skills\/autopilot\/VOICE\.md/);
+  assert.match(text, /user-facing messages[^\n]*\$\{CLAUDE_PLUGIN_ROOT\}\/skills\/autopilot\/VOICE\.md/i);
 });
 
 test("plain briefs", () => {
