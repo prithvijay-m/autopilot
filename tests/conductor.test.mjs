@@ -162,3 +162,13 @@ test("user lines are notes, not consent", () => {
   assert.match(s, /never authorised/);
   assert.match(s, /`handoff` line/);
 });
+
+test("every pause example uses a quoted plan name and a single-quoted fixed reason", () => {
+  const lines = text.split("\n").filter((l) => /pause\.mjs"? set/.test(l));
+  assert.ok(lines.length > 0);
+  for (const l of lines) {
+    assert.match(l, /set "<PLAN directory name>" '/, l);
+    assert.doesNotMatch(l, /"<reason>"/, l);
+  }
+  assert.doesNotMatch(text, /"<reason>"/);
+});
