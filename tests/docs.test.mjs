@@ -77,7 +77,7 @@ test("routing rule", () => {
 
 test("changelog version", () => {
   const top = changelog.match(/^## (\S+)/m)[1];
-  assert.equal(top, "0.3.0");
+  assert.equal(top, "0.3.1");
   assert.equal(top, plugin.version);
 });
 

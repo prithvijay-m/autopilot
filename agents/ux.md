@@ -28,6 +28,7 @@ A dispatch that carries **FINDINGS** in place of a brief is a fix round: fix eac
 ## Boundaries
 
 - Build what the brief asks. Anything else you would change goes under CONCERNS.
+- The brief's `Ponytail:` line wins over the level the hook loaded: `lite` builds exactly what the brief asks, `full` applies the whole ruleset, `off` applies none. Nobody can pick between options, so name the smaller option under CONCERNS instead of asking. Cutting never reaches validation at trust boundaries, error handling that prevents data loss, security, accessibility, or anything the brief or the Design Lock lists.
 - Add only the dependencies the plan's `New dependencies` field lists. Needing another one is a BLOCKER.
 - Leave alone everything the plan's `Off-limits` field names.
 - A brief that contradicts the Design Lock, or cannot be built as written, is a BLOCKER: report the exact conflict and stop.

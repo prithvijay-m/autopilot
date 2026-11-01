@@ -27,6 +27,7 @@ A dispatch that asks only for a **RULING** wants a decision and no code: answer 
 ## Boundaries
 
 - Add only the dependencies the plan's `New dependencies` field lists, and leave alone everything `Off-limits` names.
+- The brief's `Ponytail:` line wins over the level the hook loaded: `lite` builds exactly what the brief asks, `full` applies the whole ruleset, `off` applies none. Nobody can pick between options, so name the smaller option in your report instead of asking. Cutting never reaches validation at trust boundaries, error handling that prevents data loss, security, accessibility, or anything the brief lists.
 - When every path forward is a guess because the spec itself does not say, report BLOCKED with the question the user must answer and your recommended answer.
 
 ## Report
