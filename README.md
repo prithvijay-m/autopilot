@@ -111,9 +111,11 @@ Under `.autopilot/runs/<plan>/` in your repository (ledger, graph cards, clock, 
 
 Then set your session permission mode to **Auto** before approving a plan, so the build runs unattended.
 
+If you also keep a personal `~/.claude/skills/autopilot`, or hooks in `~/.claude/settings.json` that point at this plugin's `guard.mjs` or `read-guard.mjs`, those run **in addition to** the plugin's own hooks, so each call is guarded twice. Remove the personal copies once the plugin is installed.
+
 ### Prerequisites
 
-- **Node.js 22.19+, 24.11+, or 26+** (the scripts and rea need it).
+- **Node.js 22+** for the plugin's scripts (`engines` in `package.json` says `>=22`). rea, which only `/recon` uses, is stricter: the pinned `rea-agents@6.8.0` needs Node 22.23.4+, 24.22.1+ or 26.12.1+.
 - **git**, and **gh** authenticated if you want `/autopilot` to open pull requests.
 - Optional: **codex** (a second-model-family peer reviewer), **tmux** (terminal-app QA), a browser (web-app QA).
 
@@ -121,12 +123,18 @@ Then set your session permission mode to **Auto** before approving a plan, so th
 
 The pipeline calls skills it does not ship. Install the ones you want; see [CREDITS.md](CREDITS.md) for who made them.
 
-- Build reviews and TDD: a `supermatt`-style skill set (`qa`, `code-review`, `pr`, `tdd`, `resolving-merge-conflicts`, `dependency-vetting`).
+A skill name in the plugin's prompts is shorthand. The agent calls the Skill tool with the exact name from the session's skill listing: the bare name, or the same skill under any plugin prefix (`grilling`, `mattpocock-skills:grilling` or `supermatt:grilling`). When no listed skill matches, it says so in one line and does that step itself from first principles instead of stopping. These are all the skill names the pipeline calls:
+
+- Planning interview: `grilling`, `prototype`, `domain-modeling`, `codebase-design`, `research`, `find-skills`, `writing-for-agents`, `setup-pre-commit`.
+- Build reviews and TDD: `tdd`, `diagnosing-bugs`, `code-review`, `qa`, `pr`, `resolving-merge-conflicts`, `dependency-vetting`, `security-review`. A `supermatt`-style skill set has all of these except `security-review`, which Claude Code ships.
+- UI, charts and the Claude API: `refero-design`, `impeccable`, `dataviz`, `claude-api`.
+- Databases (the engine's own skill, for `db` tasks): `planetscale:postgres`, `planetscale:mysql`, `planetscale:vitess`, `planetscale:neki`, `planetscale:planetscale-pscale-cli-automation`, `planetscale:planetscale-change-gates-and-approval-contract`, `planetscale:planetscale-codebase-sqlcommenter-instrumentation`.
+- Reverse engineering: `reverse-engineer-anything`.
 - Cheaper context on existing codebases: **graphify** — `npm i -g graphifyy` (or `uv tool install graphifyy`).
 - UI and charts: **refero-design**, **dataviz**.
-- Reverse engineering: **rea** — `npx skills add morluto/rea --skill reverse-engineer-anything`, then `npx rea-agents setup` to register its MCP server, plus **Ghidra** for native binaries.
+- Reverse engineering: **rea** — `npx skills add morluto/rea --skill reverse-engineer-anything`, then `npx -y rea-agents@6.8.0 setup` to register its MCP server, plus **Ghidra** for native binaries.
 
-Where a companion is missing, the forge still runs the parts it can and reports the rest as blocked rather than faking it.
+Where a companion is missing, the plugin still runs the parts it can and reports the rest as blocked rather than faking it.
 
 Spending fewer tokens (a transcript reader, an image guard, a per-session rea launcher): see [docs/token-usage.md](docs/token-usage.md).
 
@@ -144,12 +152,12 @@ Spending fewer tokens (a transcript reader, an image guard, a per-session rea la
 
 ## Safety
 
-- **The guard** (a PreToolUse hook) blocks force-pushes, pushes to protected branches, hook bypasses, history rewrites, force-deletes of branches and worktrees, and recursive deletes of a root, home, or `.git`. It is a tripwire, not a sandbox: see [SECURITY.md](SECURITY.md) for what it does not catch. Every block names its rule (`[force-push]`), and the agent is told to report a blocker rather than work around it.
-- **Loosening it is your call, not the agent's.** Put a rules file at `<repo>/.autopilot/guard.json` or `~/.claude/autopilot/guard.json`:
+- **The guard** (a PreToolUse hook) blocks force-pushes, pushes to protected branches, hook bypasses, history rewrites, force-deletes of branches and worktrees, `git stash clear`, whole-tree discards (`git checkout .`, `git clean -f`), and recursive deletes of a root, home, or `.git`. It is a tripwire, not a sandbox: see [SECURITY.md](SECURITY.md) for what it does not catch. Every block names its rule (`[force-push]`), and the agent is told to report a blocker rather than work around it.
+- **Loosening it is your call, not the agent's.** Put allowances in `~/.claude/autopilot/guard.json`:
   ```json
   { "scope": "runs", "allow": ["branch-force-delete:tmp/*", "force-push:my-feature/*"] }
   ```
-  `"scope": "runs"` guards a repository only while a build is in progress there, so your own sessions are left alone. An `allow` entry is a rule id, or `rule:glob` to allow it only when every branch or path the command touches matches. The pipeline's own throwaway lane branches (`autopilot-lane/*`) and lane worktrees are allowed already.
+  `"scope": "runs"` guards a repository only while a build is in progress there, so your own sessions are left alone. An `allow` entry is a rule id, or `rule:glob` to allow it only when every branch or path the command touches matches. A repository's `<repo>/.autopilot/guard.json` can only tighten: its `allow` is ignored and its scope counts only as `"always"`. The pipeline's own throwaway lane branches (`autopilot-lane/*`) and lane worktrees are allowed already.
 - **`/recon` never crosses two lines on its own:** whether a teardown is authorized at all, and whether anything may run a target or write machine config. Both are your explicit yes.
 
 ## Development

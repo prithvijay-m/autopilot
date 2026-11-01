@@ -2,13 +2,13 @@
 // Build or refresh the project's code graph (graphify) with no model tokens.
 //   node graph-refresh.mjs            (run from the repository root)
 // - No graph yet: `graphify extract . --code-only`, then a report with no LLM labels.
-// - Graph exists: `graphify update .` (code only), forcing past the shrink guard
-//   when code was really deleted.
+// - Graph exists: `graphify update .` (code only), forcing past the shrink guard only when
+//   it refused (shrink) and git shows tracked files were really deleted; never on a plain failure.
 // - Keeps an untracked graphify-out/ out of `git status` via .git/info/exclude.
 // Prints one line starting "graph:" and always exits 0: the graph is an
 // optimisation, never a gate.
 import { execFileSync, spawnSync } from "node:child_process";
-import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
+import { appendFileSync, existsSync, lstatSync, mkdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 const root = resolve(process.argv[2] || ".");
@@ -28,6 +28,15 @@ function excludeFromGit() {
   if (!common) return;
   const info = resolve(root, common, "info");
   const file = join(info, "exclude");
+  // A repository can commit links at .git/info or its exclude file: never write through one.
+  const plain = (p, kind) => {
+    try {
+      return lstatSync(p)[kind]();
+    } catch (e) {
+      return e.code === "ENOENT";
+    }
+  };
+  if (!plain(info, "isDirectory") || !plain(file, "isFile")) return;
   // .autopilot/ holds run state (ledger, graph cards): never part of the repository or the graph.
   // graphify-out/ is left alone when the team tracks it in git.
   const wanted = [".autopilot/"];
@@ -61,7 +70,8 @@ excludeFromGit();
 if (existsSync(graph)) {
   let r = graphify("update", ".");
   let forced = false;
-  if (r.status !== 0 || /refus|shrink/i.test(`${r.stdout}${r.stderr}`)) {
+  const deleted = git("ls-files", "--deleted").stdout.trim(); // empty outside git: no evidence, no force
+  if (deleted && /refus|shrink/i.test(`${r.stdout}${r.stderr}`)) {
     r = graphify("update", ".", "--force");
     forced = true;
   }

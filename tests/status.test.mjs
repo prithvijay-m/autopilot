@@ -79,6 +79,13 @@ test("mission numbers never go back", () => {
   assert.deepEqual(out.map((x) => [x.task, x.n]), [["03", 1], ["01", 2], ["02", 3]]);
 });
 
+test("the total is never below the missions known", () => {
+  const l = { name: "demo", text: "task 01: integrated @ a\ntask 02: integrated @ b" };
+  const out = missions([l], "no table here");
+  assert.deepEqual(out.map((x) => [x.n, x.m]), [[1, 2], [2, 2]]);
+  assert.equal(renderMission(out[0]).split("\n")[0], "Mission 1 of 2 tasks completed.");
+});
+
 test("copilot ledgers count", () => {
   const c = { name: "demo-c1", text: "task 03: integrated @ c" };
   const l = { name: "demo", text: "task 01: integrated @ a\ntask 02: integrated @ b" };

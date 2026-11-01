@@ -14,7 +14,7 @@ Reverse engineering earns trust only through evidence. Every conclusion you repo
 
 ## The engine
 
-Call the Skill tool with `reverse-engineer-anything` and follow it: it routes the target to the right REA tool, works summary-first, and keeps the evidence ledger. You are the worker it describes under "Decompose work into independent questions" — you own one scope, reuse the evidence you were given, and return sources, conclusions and gaps.
+Call the Skill tool with `reverse-engineer-anything` and follow it: it routes the target to the right REA tool, works summary-first, and keeps the evidence ledger. A skill name here is shorthand: call the Skill tool with the exact name from the session's skill listing - the bare name, or the same skill under any plugin prefix (for example `grilling`, `mattpocock-skills:grilling` or `supermatt:grilling`). If no listed skill matches, say so in one line and carry out the step yourself from first principles; do not stop. You are the worker it describes under "Decompose work into independent questions" — you own one scope, reuse the evidence you were given, and return sources, conclusions and gaps.
 
 ## Scope is a wall, not a suggestion
 

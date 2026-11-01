@@ -38,19 +38,19 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/rea-mcp.mjs" enable
 
 Or, to keep rea out of every other session, start recon from a terminal with `node "${CLAUDE_PLUGIN_ROOT}/scripts/recon.mjs" "<target and question>"`: it loads rea for that one session only and writes no configuration.
 
-Then check what is actually available before promising analysis. One `runner` dispatch (or do it yourself), read-only:
+Then check what is actually available before promising analysis. This is not a read-only lookup: `npx` downloads the pinned npm package `rea-agents@6.8.0` from the registry and runs it. Tell the user so, show them the command, and run it only after their explicit yes; on anything else, treat every tier that needs rea as blocked on readiness. One `runner` dispatch (or do it yourself):
 
 ```
-npx -y rea-agents@6.5.0 doctor --client claude_code --json
+npx -y rea-agents@6.8.0 doctor --client claude_code --json
 ```
 
 Read the result and tell the user, in plain language, what the approved scope can and cannot do right now:
 
-- `node` not ok: the REA CLI and MCP need Node 22.19+, 24.11+ or 26+. Below that, even static JavaScript analysis is unsupported. Surface the exact remediation and treat deep analysis as blocked until it is fixed.
+- `node` not ok: the pinned REA CLI and MCP need Node 22.23.4+, 24.22.1+ or 26.12.1+. Below that, even static JavaScript analysis is unsupported. Surface the exact remediation and treat deep analysis as blocked until it is fixed.
 - `registration:claude_code` not ok: the MCP server is not registered, so REA's analysis tools are absent from this session. Only the `analyze-javascript-application` CLI works without it, and only within Node support.
 - A provider `missing_analysis_engine` (ghidra, ida, jadx, hopper): that native tier is unavailable. Static JavaScript, Go, Rust, SQLite, ELF layout, PE resources and recorded-capture tiers need no such engine; native decompilation does.
 
-**Registering the MCP server or installing an engine is a human decision**, because `rea setup` writes client configuration and can install Hopper. When the approved scope needs tools that are absent, show the user the read-only plan (`npx -y rea-agents@latest setup --client claude_code --dry-run --json`) and its exact paths and changes, and wait for explicit approval before any `setup` without `--dry-run`. Never run setup, install an engine, or set an engine path on your own. When the user declines, continue with whatever the available tier supports and mark the rest blocked on readiness.
+**Registering the MCP server or installing an engine is a human decision**, because `rea setup` writes client configuration and can install Hopper. When the approved scope needs tools that are absent, show the user the read-only plan (`npx -y rea-agents@6.8.0 setup --client claude_code --dry-run --json`) and its exact paths and changes, and wait for explicit approval before any `setup` without `--dry-run`. Never run setup, install an engine, or set an engine path on your own. When the user declines, continue with whatever the available tier supports and mark the rest blocked on readiness.
 
 ## 3. Investigate
 

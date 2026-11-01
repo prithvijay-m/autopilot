@@ -69,6 +69,19 @@ test("deploy source", () => {
   assert.match(b, /only when the user's next message is an explicit yes\. Treat anything else as no: stop and dispatch nothing\./);
 });
 
+test("test and merge show the plan path and exact Gate, and need an explicit yes", () => {
+  for (const n of ["test", "merge"]) {
+    const b = body(n);
+    assert.match(b, /Show the plan path/, n);
+    assert.match(b, /the exact Gate command/, n);
+    assert.match(b, /ask the user to confirm/, n);
+    assert.match(b, /only when the user's next message is an explicit yes\. Treat anything else as no: stop and dispatch nothing\./, n);
+  }
+  assert.ok(body("merge").indexOf("explicit yes") < body("merge").indexOf("6. Dispatch the agent `autopilot:runner`"), "merge asks before step 6 dispatches");
+  assert.match(body("merge"), /Show the plan path, the integration branch, the branches that will be merged, and the exact Gate command/);
+  assert.match(body("test"), /Read only the Contract row `Gate`/);
+});
+
 test("test gate", () => {
   const b = body("test");
   assert.match(b, /`Gate`/);

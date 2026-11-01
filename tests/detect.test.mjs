@@ -77,6 +77,16 @@ test("citations extracts paths and shas", () => {
   assert.deepEqual(c.shas.sort(), ["abc1234", "deadbeef0"]);
 });
 
+test("citations: dates, numbers and words are not shas", () => {
+  assert.deepEqual(citations("`20261101` `8080808` `defaced` `a1b2c3d`").shas, ["a1b2c3d"]);
+  assert.deepEqual(citations("fixed @ 8080808").shas, ["8080808"]);
+});
+
+test("a backticked real short sha is still checked", () => {
+  const r = repoOf({ "src/a.js": "x\n" });
+  assert.equal(unresolvedCitations(r.dir, null, citations("see `20261101` `defaced` and `1234567abcdef`")).length, 1);
+});
+
 test("missing path", () => {
   const r = repoOf({ "src/a.js": "x\n" });
   const sha = r.git("rev-parse", "HEAD").out;

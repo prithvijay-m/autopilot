@@ -4,6 +4,7 @@ description: "Turns a finished interview into a buildable plan: reads the decisi
 model: opus
 effort: high
 disallowedTools: Agent
+tools: Bash, PowerShell, Read, Write, Edit, Grep, Glob, Skill, ToolSearch
 maxTurns: 120
 color: purple
 ---

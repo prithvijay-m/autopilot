@@ -7,7 +7,7 @@ disable-model-invocation: true
 
 # Blueprint
 
-Agents of this plugin are dispatched by their scoped name, `autopilot:<agent>` (`autopilot:planner`, `autopilot:coder`), so a same-named agent of the user's cannot shadow them. The bare names in this file are shorthand for those.
+Agents of this plugin are dispatched by their scoped name, `autopilot:<agent>` (`autopilot:planner`, `autopilot:coder`), so a same-named agent of the user's cannot shadow them. The bare names in this file are shorthand for those. A skill name here is shorthand: call the Skill tool with the exact name from the session's skill listing - the bare name, or the same skill under any plugin prefix (for example `grilling`, `mattpocock-skills:grilling` or `supermatt:grilling`). If no listed skill matches, say so in one line and carry out the step yourself from first principles; do not stop.
 
 Turn `$ARGUMENTS` into a **blueprint**: a plan directory that `/autopilot` builds with nobody watching. `/autopilot` runs this procedure as its Plan phase; typed on its own, `/blueprint` plans now and leaves the build for later. This is the only stage where the user answers anything, so every decision an implementer would otherwise guess gets settled here. This skill is the whole planning process for this run, standing in for any brainstorming or plan-writing skill, and it writes no product code.
 

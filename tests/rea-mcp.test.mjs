@@ -58,3 +58,26 @@ test("rea-mcp keeps the config's permissions and writes through a symlink", { sk
     home.cleanup();
   }
 });
+
+test("every rea-agents@ in the repository uses the one pinned REA_VERSION, and none is unpinned", async () => {
+  const { readdirSync } = await import("node:fs");
+  const { dirname, relative } = await import("node:path");
+  const { fileURLToPath } = await import("node:url");
+  const { REA_VERSION } = await import("../scripts/rea-mcp.mjs");
+  const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+  const skip = new Set([".git", "node_modules", "graphify-out", ".autopilot", ".impeccable", "tests"]);
+  const walk = (d) => readdirSync(d, { withFileTypes: true }).flatMap((e) => (skip.has(e.name) ? [] : e.isDirectory() ? walk(join(d, e.name)) : [join(d, e.name)]));
+  assert.match(REA_VERSION, /^\d+\.\d+\.\d+$/);
+  let seen = 0;
+  for (const f of walk(root)) {
+    const rel = relative(root, f).replace(/\\/g, "/");
+    if (!/\.(md|mjs|json|ya?ml)$/.test(rel) || /^docs\/plans\//.test(rel) || rel === "CHANGELOG.md" || rel === "tools/rea-bump.mjs") continue; // the bump tool names rea-agents@latest on purpose
+    const text = readFileSync(f, "utf8");
+    for (const m of text.matchAll(/rea-agents@(\$\{REA_VERSION\}|[\w.-]*)/g)) {
+      seen++;
+      assert.equal(m[1] === "${REA_VERSION}" ? REA_VERSION : m[1], REA_VERSION, `${rel} names rea-agents@${m[1]}`);
+    }
+    assert.ok(!/npx\s+(-y\s+)?rea-agents(?![@\w-])/.test(text), `${rel} runs rea-agents unpinned`);
+  }
+  assert.ok(seen >= 3, "found the pinned references");
+});

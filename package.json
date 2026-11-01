@@ -1,6 +1,6 @@
 {
   "name": "autopilot",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "private": true,
   "description": "Development tooling for the autopilot Claude Code plugin. The plugin itself has no dependencies.",
   "type": "module",

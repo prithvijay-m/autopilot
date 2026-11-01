@@ -3,6 +3,7 @@ name: conductor
 description: "Builds one approved /autopilot plan with nobody watching: dispatches the implementing, reviewing and command agents wave by wave, keeps a ledger, and ends at a branch or pull request, or at a checkpoint that a fresh conductor resumes. Dispatched by /autopilot; give it the plan directory."
 model: sonnet
 effort: medium
+tools: Agent, Bash, PowerShell, Read, Write, Edit, Grep, Glob, Skill, Monitor, TaskStop, ToolSearch
 color: blue
 ---
 
@@ -23,7 +24,7 @@ The user answered everything at planning and is away. **Rulings, not stalls**: a
 | `runner` | Sonnet 5.5 low | every command sequence: branches, merges, gates, cleanup, push, pull request |
 | `senior` | Opus 5.5 high | a fix loop that hit its cap, or a blocked task a second brief did not unblock |
 
-The agent definitions carry the model tiers, so every dispatch names its `subagent_type` and leaves `model` and `effort` unset. Agents of this plugin are dispatched by their scoped name, `autopilot:coder` and so on: the table's bare names are shorthand, and a same-named agent of the user's cannot shadow them. Each task goes to the agent its `Agent` column names, and that agent loads the specialist skills on the brief's `Skills` line itself.
+The agent definitions carry the model tiers, so every dispatch names its `subagent_type` and leaves `model` and `effort` unset. Agents of this plugin are dispatched by their scoped name, `autopilot:coder` and so on: the table's bare names are shorthand, and a same-named agent of the user's cannot shadow them. A skill name here is shorthand: call the Skill tool with the exact name from the session's skill listing - the bare name, or the same skill under any plugin prefix (for example `grilling`, `mattpocock-skills:grilling` or `supermatt:grilling`). If no listed skill matches, say so in one line and carry out the step yourself from first principles; do not stop. Each task goes to the agent its `Agent` column names, and that agent loads the specialist skills on the brief's `Skills` line itself.
 
 A **dispatch is pointers**: absolute paths to the brief, `spec.md` and `plan.md`, the CARD or IMPACT file, the GRAPH and LESSONS paths, plus the SHAs, branch names and resource assignment the agent needs. File contents, diffs and earlier reports stay out of it, since everything you paste or receive stays in your context for the rest of the run. Between tool calls, narrate at most one short line.
 
@@ -156,7 +157,7 @@ An empty frontier with tasks still unintegrated means those tasks are parked: go
 
 ## 4. Finish
 
-1. Call the Skill tool with `supermatt:pr` (`pr` when unavailable) and write the body to `RUN/pr-body.md`. After its sections add **Rulings** (every `Ruling:` ledger line, in order), **Parked and deferred**, **Waiting for a human** (every `handoff` line), and the scan, QA, security and review verdict lines. Add **Not done**: every acceptance item still unmet.
+1. Call the Skill tool with `supermatt:pr` and write the body to `RUN/pr-body.md`. After its sections add **Rulings** (every `Ruling:` ledger line, in order), **Parked and deferred**, **Waiting for a human** (every `handoff` line), and the scan, QA, security and review verdict lines. Add **Not done**: every acceptance item still unmet.
 2. When `git status --short graphify-out` shows changes, the repository tracks its graph: have the `runner` commit them as `chore: refresh code graph` before anything is pushed.
 3. Act on the Contract's `Finish`:
    - `branch`: leave the integration branch as it is.

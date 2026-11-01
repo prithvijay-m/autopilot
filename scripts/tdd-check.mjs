@@ -8,7 +8,7 @@
 // PASS means the tests fail without the change. WEAK PASS means they fail only because a new file they
 // import is gone: a reviewer has to read the assertions.
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -49,6 +49,18 @@ async function main() {
   const git = (...args) => spawnSync("git", ["-c", "core.quotePath=false", ...args], { encoding: "utf8" });
 
   if (git("rev-parse", "--verify", "--quiet", `${base}^{commit}`).status !== 0) return say(`SKIPPED - ${base} is not a commit`);
+  // A killed run (SIGKILL) leaves the marker and a reverted tree. The marker lists the files we reverted:
+  // reset only when every dirty tracked file is one of them, never over the user's own edits.
+  const gitDir = git("rev-parse", "--absolute-git-dir").stdout.trim();
+  const marker = join(gitDir, "tdd-check.dirty");
+  if (existsSync(marker)) {
+    const reverted = readFileSync(marker, "utf8").split("\n").slice(1).filter(Boolean);
+    const foreign = git("diff", "--name-only", "HEAD").stdout.split("\n").filter((f) => f && !reverted.includes(f));
+    if (foreign.length) return say(`SKIPPED - a previous run was killed and the tree has other uncommitted changes (${foreign.join(", ")}); restore the source files yourself (git checkout HEAD -- ${reverted.join(" ")})`);
+    git("reset", "-q", "--hard", "HEAD");
+    unlinkSync(marker);
+    return say("SKIPPED - a previous run was killed while the source was reverted; the tree has been restored. Run the check again");
+  }
   if (git("status", "--porcelain", "--untracked-files=no").stdout.trim()) return say("SKIPPED - the tree has uncommitted changes; commit first");
 
   const listing = git("diff", "--name-status", "--no-renames", `${base}..HEAD`).stdout;
@@ -68,13 +80,6 @@ async function main() {
   // The source is reverted in place (the tests need the checkout's dependencies), so a killed run
   // would leave the tree reverted. Restore on every signal we can catch, and leave a marker for
   // the one we cannot (SIGKILL): the next run restores before it starts.
-  const gitDir = git("rev-parse", "--absolute-git-dir").stdout.trim();
-  const marker = join(gitDir, "tdd-check.dirty");
-  if (existsSync(marker)) {
-    git("reset", "-q", "--hard", "HEAD");
-    unlinkSync(marker);
-    return say("SKIPPED - a previous run was killed while the source was reverted; the tree has been restored. Run the check again");
-  }
   let child = null;
   for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"]) {
     process.on(sig, () => {
@@ -103,7 +108,7 @@ async function main() {
 
   let result;
   try {
-    writeFileSync(marker, `${base}\n`);
+    writeFileSync(marker, `${base}\n${[...source.added, ...source.changed].join("\n")}\n`);
     // Source as it was at BASE; tests as they are at HEAD.
     for (const f of source.added) if (existsSync(f)) rmSync(join(process.cwd(), f));
     for (let i = 0; i < source.changed.length; i += 50) {

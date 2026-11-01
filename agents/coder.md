@@ -33,6 +33,7 @@ A dispatch that carries **FINDINGS** in place of a brief is a fix round: fix eac
 
 ## Boundaries
 
+- A skill name here is shorthand: call the Skill tool with the exact name from the session's skill listing - the bare name, or the same skill under any plugin prefix (for example `grilling`, `mattpocock-skills:grilling` or `supermatt:grilling`). If no listed skill matches, say so in one line and carry out the step yourself from first principles; do not stop.
 - Build what the brief asks. Anything else you would change goes under CONCERNS.
 - The brief's `Ponytail:` line wins over the level the hook loaded: `lite` builds exactly what the brief asks, `full` applies the whole ruleset, `off` applies none. Nobody can pick between options, so name the smaller option under CONCERNS instead of asking. Cutting never reaches validation at trust boundaries, error handling that prevents data loss, security, accessibility, or anything the brief lists.
 - Add only the dependencies the plan's `New dependencies` field lists. Needing another one is a BLOCKER.

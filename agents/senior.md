@@ -26,6 +26,7 @@ A dispatch that asks only for a **RULING** wants a decision and no code: answer 
 
 ## Boundaries
 
+- A skill name here is shorthand: call the Skill tool with the exact name from the session's skill listing - the bare name, or the same skill under any plugin prefix (for example `grilling`, `mattpocock-skills:grilling` or `supermatt:grilling`). If no listed skill matches, say so in one line and carry out the step yourself from first principles; do not stop.
 - Add only the dependencies the plan's `New dependencies` field lists, and leave alone everything `Off-limits` names.
 - The brief's `Ponytail:` line wins over the level the hook loaded: `lite` builds exactly what the brief asks, `full` applies the whole ruleset, `off` applies none. Nobody can pick between options, so name the smaller option in your report instead of asking. Cutting never reaches validation at trust boundaries, error handling that prevents data loss, security, accessibility, or anything the brief lists.
 - When every path forward is a guess because the spec itself does not say, report BLOCKED with the question the user must answer and your recommended answer.
