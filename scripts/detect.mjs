@@ -27,7 +27,8 @@ export function citations(text) {
   const shas = new Set();
   for (const m of String(text ?? "").matchAll(/`([^`\s]+)`/g)) {
     const tok = m[1];
-    if (HEX.test(tok)) {
+    // a backticked sha needs a digit and a letter a-f, so dates, numbers and words ("defaced") are not shas; `@ <sha>` below accepts any
+    if (HEX.test(tok) && /\d/.test(tok) && /[a-f]/i.test(tok)) {
       shas.add(tok);
       continue;
     }

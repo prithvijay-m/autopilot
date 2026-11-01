@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.3.2
+
+Fixes from an independent review: detect no longer mistakes dates and numbers for commit shas; retro only counts lessons from the current run; lessons are capped, sanitised and no longer promoted to every project directly; the guard ignores allowances in repository rule files and gains rules for config hooksPath, protected-branch rename, stash clear and whole-tree discard; copilots understand globs in Touches; graph-refresh forces only after real deletions; tdd-check keeps your edits after a killed run; read-guard double count fixed.
+
+**rea stays current.** A weekly workflow (`.github/workflows/rea-bump.yml`) runs `tools/rea-bump.mjs`. When npm has a newer `rea-agents` with no preinstall, install or postinstall script, it rewrites the pin and the Node range, runs `npm run check` and opens a pull request. A person merges it.
+
+**Skills the pipeline calls**
+- A skill name in a prompt is now shorthand with one rule: call the Skill tool with the exact name from the session's skill listing (the bare name, or the same skill under any plugin prefix), and when none matches, say so in one line and do the step from first principles. It is stated in the blueprint skill, its routing table, the conductor, reviewer, senior, senior-analyst, analyst, coder, ux and db agents (and the scout, which has no Skill tool). The inconsistent bare `pr` and `qa` fallbacks are gone. The README's Companion skills lists every skill name the pipeline calls, and a test keeps that list complete.
+
+**Role limits**
+- The conductor now has a tool allowlist (no web or notebook tools), the planner has one (no web, no Agent), and the reviewer can no longer use Edit. The analysts keep all tools but Agent so that the rea MCP tools stay reachable.
+
+**Commands**
+- `/autopilot:test` and `/autopilot:merge` show the plan path and the exact `Gate` command (and, for merge, the branches to merge) and dispatch only on an explicit yes, as `/autopilot:deploy` already did.
+
+**Recon**
+- One pinned `rea-agents` version, `REA_VERSION` in `scripts/rea-mcp.mjs`, bumped to 6.8.0 (no preinstall, install or postinstall script; it needs Node 22.23.4+, 24.22.1+ or 26.12.1+). `/recon` names it everywhere, including the `setup --dry-run` plan, and a test checks every `rea-agents@` in the repository.
+- The readiness check is no longer described as read-only: it downloads and runs the pinned package, so `/recon` tells you and waits for your yes.
+- `scripts/recon.mjs` uses an `autopilot-recon-` temp directory, and on Windows spawns `claude.cmd` with each argument quoted for cmd.exe and its metacharacters removed, instead of passing raw text to a shell.
+
+**Hygiene**
+- Remaining `forge` wording removed from the README and CREDITS; the README states the Node requirement (22+ for the scripts, the rea range for `/recon`), warns that a personal copy of the skill or its guard hooks makes each call guarded twice, and a plugin icon is added. CI actions are pinned to commit SHAs.
+- A behavioural smoke test (`tests/pipeline-smoke.test.mjs`) runs status, copilots, host-load, pause and the pause hook end to end in a temporary repository.
+
 ## 0.3.1
 
 **Ponytail levels**

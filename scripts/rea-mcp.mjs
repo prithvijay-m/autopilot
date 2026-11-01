@@ -15,9 +15,13 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
 const CONFIG = join(homedir(), ".claude.json");
+// The one rea-agents version this plugin runs: /recon, recon.mjs and the README all name this one (a test checks).
+// 6.8.0 has no preinstall, install or postinstall script (npm view rea-agents@6.8.0 scripts); re-check before bumping.
+export const REA_VERSION = "6.8.0";
+const PKG = `rea-agents@${REA_VERSION}`;
 export const ENTRY = process.platform === "win32"
-  ? { command: "cmd.exe", args: ["/d", "/c", "npx", "-y", "rea-agents@6.5.0", "mcp"] }
-  : { command: "npx", args: ["-y", "rea-agents@6.5.0", "mcp"] };
+  ? { command: "cmd.exe", args: ["/d", "/c", "npx", "-y", PKG, "mcp"] }
+  : { command: "npx", args: ["-y", PKG, "mcp"] };
 
 function main() {
   const cmd = (process.argv[2] || "status").toLowerCase();

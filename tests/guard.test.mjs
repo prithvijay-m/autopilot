@@ -13,6 +13,20 @@ const guard = join(here, "..", "scripts", "guard.mjs");
 const home = homedir();
 
 const BLOCK = [
+  "git config core.hooksPath /dev/null",
+  "git config --global core.hookspath /tmp/none",
+  "git branch -m main old-main",
+  "git branch -M feature main",
+  "git branch --move release x",
+  "git stash clear",
+  "git checkout -- .",
+  "git checkout .",
+  "git restore .",
+  "git restore --worktree :/",
+  "git restore --source=HEAD~1 .",
+  "git clean -f",
+  "git clean -fd",
+  "git clean -fd .",
   "git push --force",
   "git push -f origin autopilot/x",
   "git push --force-with-lease origin autopilot/x",
@@ -75,6 +89,21 @@ const BLOCK = [
 ];
 
 const ALLOW = [
+  "git config core.hooksPath",
+  "git config --unset core.hooksPath",
+  "git config user.name x",
+  "git branch -m old new",
+  "git stash drop",
+  "git stash",
+  "git checkout -- src/a.ts",
+  "git checkout main",
+  "git checkout --theirs .",
+  "git restore --staged .",
+  "git restore src/a.ts",
+  "git clean -n",
+  "git clean -fdn",
+  "git clean --dry-run -f",
+  "git clean -f build/",
   "git push -u origin autopilot/checkout",
   "git push origin autopilot/checkout",
   "git push origin HEAD:autopilot/checkout",
@@ -86,7 +115,7 @@ const ALLOW = [
   "git reset --hard HEAD",
   "git reset HEAD~1",
   "git clean -n -fdx",
-  "git clean -fd",
+  "git clean -fd dist/",
   "git branch -d autopilot/x/01",
   "git switch -C autopilot/x/01 abc123",
   "git checkout -b feature",
@@ -202,7 +231,18 @@ test("the pipeline's own lane branches and worktrees are allowed by default", ()
   assert.notEqual(verdict("git branch -D autopilot/x", here), null);
 });
 
-test("rules files: allow lists add up, the nearest scope wins, bad files are ignored", () => {
+test("new rules have ids and can be allowed", () => {
+  const id = (c) => verdict(c, here)?.id;
+  assert.equal(id("git config --global core.hooksPath x"), "hook-bypass");
+  assert.equal(id("git branch -m main x"), "protected-branch-move");
+  assert.equal(id("git stash clear"), "stash-clear");
+  assert.equal(id("git checkout ."), "discard-worktree");
+  assert.equal(id("git clean -fd"), "discard-worktree");
+  assert.equal(verdict("git stash clear", here, ["stash-clear"]), null);
+  assert.equal(verdict("git clean -f", here, ["discard-worktree"]), null);
+});
+
+test("rules files: only the machine's allow counts; the repository's file can only tighten", () => {
   const root = mkdtempSync(join(tmpdir(), "guard-rules-"));
   try {
     const hm = join(root, "home");
@@ -212,9 +252,15 @@ test("rules files: allow lists add up, the nearest scope wins, bad files are ign
     const old = process.env.AUTOPILOT_HOME;
     process.env.AUTOPILOT_HOME = hm;
     try {
+      const repoFile = (j) => writeFileSync(join(repo, ".autopilot", "guard.json"), JSON.stringify(j));
+      writeFileSync(join(hm, "guard.json"), JSON.stringify({ scope: "runs", allow: ["gc-prune", 7] }));
+      repoFile({ scope: "always", allow: ["force-push", "protected-push", "hook-bypass"] });
+      assert.deepEqual(loadRules(repo), { scope: "always", allow: ["gc-prune"] }, "repo 'always' honoured, repo allow ignored, machine allow kept");
+      repoFile({ scope: "runs", allow: ["force-push"] });
+      assert.deepEqual(loadRules(repo), { scope: "runs", allow: ["gc-prune"] }, "repo 'runs' cannot loosen; the machine's scope decides");
+      writeFileSync(join(hm, "guard.json"), JSON.stringify({ allow: ["gc-prune"] }));
+      assert.deepEqual(loadRules(repo), { scope: null, allow: ["gc-prune"] }, "repo 'runs' ignored even when the machine is silent");
       writeFileSync(join(hm, "guard.json"), JSON.stringify({ scope: "runs", allow: ["gc-prune"] }));
-      writeFileSync(join(repo, ".autopilot", "guard.json"), JSON.stringify({ scope: "always", allow: ["force-push:tmp/*", 7] }));
-      assert.deepEqual(loadRules(repo), { scope: "always", allow: ["force-push:tmp/*", "gc-prune"] });
       writeFileSync(join(repo, ".autopilot", "guard.json"), "{ not json");
       assert.deepEqual(loadRules(repo), { scope: "runs", allow: ["gc-prune"] });
       assert.deepEqual(loadRules(root), { scope: "runs", allow: ["gc-prune"] });
@@ -300,6 +346,18 @@ test("scope runs: the hook guards a repository only while a run is in progress",
     assert.equal(run(call("git gc --prune=now", repo), env).status, 0, "allowed by the machine rules");
     writeFileSync(join(repo, ".autopilot", "state.json"), JSON.stringify({ phase: "done" }));
     assert.equal(run(call("git push --force", repo), env).status, 0, "run finished");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a repository guard.json cannot switch the guard off", () => {
+  const root = mkdtempSync(join(tmpdir(), "guard-repo-"));
+  try {
+    const repo = join(root, "repo");
+    mkdirSync(join(repo, ".autopilot"), { recursive: true });
+    writeFileSync(join(repo, ".autopilot", "guard.json"), JSON.stringify({ allow: ["protected-push", "force-push", "hook-bypass"], scope: "runs" }));
+    assert.equal(run(call("git push -f origin main", repo)).status, 2);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

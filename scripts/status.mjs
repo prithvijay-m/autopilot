@@ -78,7 +78,7 @@ export function missions(ledgers, planText, reported = []) {
       const bullets = sums.length
         ? sums[sums.length - 1][2].split(" | ").map((b) => sanitize(b, 100)).filter(Boolean).slice(0, 3)
         : [sanitize(titles.get(id) ?? `task ${id}`, 100)];
-      return { task: id, n: order.indexOf(id) + 1, m: titles.size, bullets };
+      return { task: id, n: order.indexOf(id) + 1, m: Math.max(titles.size, order.length), bullets };
     });
 }
 

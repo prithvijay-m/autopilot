@@ -17,12 +17,12 @@ const repo = () => {
   cleanups.push(r.cleanup);
   return r;
 };
-const lesson = (text, count) => ({ id: "x", scope: "repo", tags: [], text, count, last: "2026-10-01", projects: ["/a"] });
+const lesson = (text, count, last = "2026-10-28") => ({ id: "x", scope: "repo", tags: [], text, count, last, projects: ["/a"] });
 const HEAD = "# autopilot ledger: /w/docs/plans/2026-10-28-demo-plan\n";
 const kinds = (ps) => ps.map((p) => p.kind);
 
 test("repeated lesson", () => {
-  const ps = problems({ ledger: HEAD, lessons: [lesson("seen twice -> fix it", 2), lesson("seen once -> ignore", 1)] });
+  const ps = problems({ ledger: HEAD, date: "2026-10-28", lessons: [lesson("seen twice -> fix it", 2), lesson("seen once -> ignore", 1), lesson("old repeat -> ignore", 5, "2026-10-01")] });
   assert.deepEqual(kinds(ps), ["lesson"]);
   assert.match(ps[0].evidence[0], /seen twice/);
 });
@@ -100,6 +100,20 @@ test("CLI: none, written, missing", () => {
   assert.match(o.out, /^retro: no ledger at /);
 });
 
+test("CLI: an old count>=2 lesson on a clean run is none; one reinforced in this run proposes", () => {
+  const r = repo();
+  const run = scratch();
+  const home = scratch();
+  writeFileSync(join(run, "ledger.md"), `${HEAD}task 01: done\n`);
+  const store = (last) => writeFileSync(join(home, "lessons.json"), JSON.stringify({ version: 1, lessons: [{ id: "m", scope: "machine", tags: [], text: "old repeat -> fix it", count: 3, first: "2026-09-01", last, projects: ["/a", "/b"] }] }));
+  const go = () => node(home, "retro.mjs", [run, "--out", r.dir, "--date", "2026-10-28"], { AUTOPILOT_HOME: home, HOME: home, USERPROFILE: home });
+  store("2026-10-01");
+  assert.equal(go().out, "retro: none");
+  assert.ok(!existsSync(join(r.dir, "docs", "improvements")));
+  store("2026-10-28");
+  assert.match(go().out, /^retro: 1 repeated problems -> /);
+});
+
 test("CLI: a dangling proposal link creates no file at its target", () => {
   const r = repo();
   const run = scratch();
@@ -153,4 +167,10 @@ test("CLI: a hostile plan line never reaches the proposal file name", () => {
   writeFileSync(join(bad, "ledger.md"), "# autopilot ledger: /x/a `id`\ntask 07: parked why\ntask 05: fix round 3/3\n");
   runCli([bad, "--out", r.dir, "--date", "2026-10-29"]);
   assert.ok(readdirSync(join(r.dir, "docs", "improvements")).includes("2026-10-29-run.md"));
+});
+
+test("a lesson reinforced after the run began counts even when the retro runs on a later date", () => {
+  const l = { id: "x", scope: "repo", tags: [], text: "seen twice -> fix it", count: 2, last: "2026-10-28", projects: ["/a"] };
+  assert.equal(problems({ ledger: "", date: "2026-10-29", since: "2026-10-28", lessons: [l] }).length, 1);
+  assert.equal(problems({ ledger: "", date: "2026-10-29", lessons: [l] }).length, 0);
 });

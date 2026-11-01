@@ -1,0 +1,41 @@
+name: rea-bump
+
+# Opens a pull request when npm has a newer rea-agents. A person merges it: the pin is what /recon runs with `npx -y`.
+on:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+      - name: Bump the pin
+        id: bump
+        run: |
+          node tools/rea-bump.mjs | tee bump.txt
+          if git diff --quiet; then echo "changed=false" >> "$GITHUB_OUTPUT"; else echo "changed=true" >> "$GITHUB_OUTPUT"; fi
+      - name: Check
+        if: steps.bump.outputs.changed == 'true'
+        run: npm run check
+      - name: Open the pull request
+        if: steps.bump.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(grep -o 'REA_VERSION = "[0-9.]*"' scripts/rea-mcp.mjs | grep -o '[0-9][0-9.]*')
+          BRANCH="chore/rea-$VERSION"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git commit -am "chore: bump rea-agents to $VERSION"
+          git push origin "$BRANCH"
+          gh pr create --title "chore: bump rea-agents to $VERSION" --body "$(cat bump.txt). npm test and validate passed. Read the new version's changelog and lifecycle scripts before merging: /recon runs it with npx -y."

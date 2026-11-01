@@ -4,18 +4,21 @@
 // transcription once cost 80M cache-read and 33M cache-write tokens on its own.
 // Exit 2 blocks the call; stderr tells the agent how to carry on (one contact sheet).
 // Fails open: anything it cannot parse is allowed.
+import { pathToFileURL } from "node:url";
 import { closeSync, openSync, readSync, fstatSync, readFileSync } from "node:fs";
 
 const LIMIT = Number(process.env.AUTOPILOT_IMAGE_LIMIT || 12);
 const IMAGE = /\.(png|jpe?g|gif|webp|bmp)$/i;
 
-function countImages(path) {
+const CHUNK = 8 * 1024 * 1024;
+
+export function countImages(path, chunk = CHUNK) {
   // Count image blocks already in the transcript, in 8 MB chunks so a huge file stays cheap.
   let fd;
   try {
     fd = openSync(path, "r");
     const size = fstatSync(fd).size;
-    const buf = Buffer.alloc(8 * 1024 * 1024);
+    const buf = Buffer.alloc(chunk);
     let count = 0;
     let carry = "";
     for (let pos = 0; pos < size; ) {
@@ -23,7 +26,7 @@ function countImages(path) {
       if (n <= 0) break;
       const text = carry + buf.toString("latin1", 0, n);
       count += (text.match(/"type":"image"/g) || []).length;
-      carry = text.slice(-16);
+      carry = text.slice(-13); // one short of the pattern, so no match is counted twice
       pos += n;
     }
     return count;
@@ -54,4 +57,4 @@ function main() {
   return 2;
 }
 
-process.exit(main());
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) process.exit(main());

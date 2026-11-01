@@ -42,8 +42,17 @@ export function integrated(ledgerText) {
   return ids;
 }
 
-/** True when the entries are equal or one is a directory prefix of the other. */
+/** An entry's literal directory prefix: what precedes the first glob metacharacter, cut back to a `/`. */
+const literal = (p) => {
+  const i = p.search(/[*?[{]/);
+  return i < 0 ? p : p.slice(0, i).replace(/\/?[^/]*$/, "");
+};
+
+/** True when the entries are equal or one is a directory prefix of the other, globs reduced to their literal prefix. */
 export function overlaps(a, b) {
+  a = literal(a);
+  b = literal(b);
+  if (!a || !b) return true;
   return a === b || a.startsWith(`${b}/`) || b.startsWith(`${a}/`);
 }
 

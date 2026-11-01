@@ -7,12 +7,13 @@
 // A tripwire, not a sandbox: anything it cannot parse is allowed (fails open).
 //
 // Every block has a rule id (shown in the message). A user, never an agent, can
-// loosen it in a rules file, read from <repo>/.autopilot/guard.json then
-// ~/.claude/autopilot/guard.json (AUTOPILOT_HOME overrides the directory):
+// loosen it in ~/.claude/autopilot/guard.json (AUTOPILOT_HOME overrides the directory):
 //   { "scope": "always" | "runs",            // "runs": only guard while a run is in progress
 //     "allow": ["force-push", "protected-push:main", "branch-force-delete:tmp/*"] }
 // An entry is a rule id, or `rule:glob` to allow it only when every branch, path
 // or ref it touches matches the glob.
+// <repo>/.autopilot/guard.json can only TIGHTEN: its `allow` is ignored and its
+// scope counts only when it is "always". A cloned repo must not switch the guard off.
 import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
@@ -202,11 +203,19 @@ function checkGit(args, cwd) {
   if (sub === "clean" && !has("--dry-run") && !flags.some((f) => isCluster(f, "n")) && flags.some((f) => isCluster(f, "xX"))) return hit("clean-ignored", "it deletes ignored files, which include the run's ledger, dependencies and local env files. Remove the specific paths you mean", positional);
   if (sub === "branch") {
     if (flags.some((f) => isCluster(f, "D")) || ((has("--delete") || flags.some((f) => isCluster(f, "d"))) && (has("--force") || flags.some((f) => isCluster(f, "f"))))) return hit("branch-force-delete", "it force-deletes a branch that may hold unmerged work. Use `git branch -d`, which refuses unmerged branches", positional);
+    // a rename touches both names; a lone name renames the current branch
+    if ((has("--move") || flags.some((f) => isCluster(f, "mM"))) && [...positional, ...(positional.length === 1 ? [currentBranch(dir)] : [])].some((p) => PROTECTED.test(p))) return hit("protected-branch-move", "it renames a protected branch, or renames onto one. Leave protected branch names alone", positional);
     if ((has("--force") || flags.some((f) => isCluster(f, "fM"))) && positional.some((p) => PROTECTED.test(p))) return hit("protected-branch-move", "it force-moves a protected branch", positional);
   }
   if ((sub === "switch" || sub === "checkout") && flags.some((f) => isCluster(f, "CB") || f === "--force-create")) {
     if (positional.length && PROTECTED.test(positional[0])) return hit("protected-branch-move", `it resets the protected branch '${positional[0]}'`, [positional[0]]);
   }
+  if (sub === "config" && /^core\.hookspath$/i.test(positional[0] ?? "") && positional.length > 1 && !has("--unset", "--get", "--get-all")) return hit("hook-bypass", "it sets core.hooksPath to skip the repository's hooks. Fix what the hook reports and commit normally");
+  if (sub === "stash" && positional[0] === "clear") return hit("stash-clear", "it deletes every stash, and stashed work is not in any branch. Drop or apply the one stash you mean");
+  const everything = (p) => p === "." || p === ":/";
+  const staged = (has("--staged") || flags.some((f) => isCluster(f, "S"))) && !(has("--worktree") || flags.some((f) => isCluster(f, "W")));
+  if (((sub === "checkout" && !has("--ours", "--theirs")) || (sub === "restore" && !staged)) && positional.some(everything)) return hit("discard-worktree", "it discards every uncommitted change in the tree. Restore the specific files you mean, or commit or stash first", positional);
+  if (sub === "clean" && (has("--force") || flags.some((f) => isCluster(f, "f"))) && !has("--dry-run") && !flags.some((f) => isCluster(f, "n")) && positional.every(everything)) return hit("discard-worktree", "it deletes every untracked file in the tree. Remove the specific paths you mean", positional);
   if (sub === "worktree" && positional[0] === "remove" && (has("--force") || flags.some((f) => isCluster(f, "f")))) {
     return hit("worktree-force-remove", "it force-removes a worktree that still has changes. Commit or report those changes, then remove it without --force", positional.slice(1).map((p) => resolve(dir, p).replace(/\\/g, "/")));
   }
@@ -335,7 +344,7 @@ export function runActive(cwd) {
   }
 }
 
-/** Rules files: the repository's, then the machine's. Allow lists add up; the repository's scope wins. */
+/** Rules files: the machine's decide. The repository's can only tighten: its allow is ignored, its scope counts only as "always". */
 export function loadRules(cwd) {
   const files = [];
   for (let dir = resolve(cwd); ; dir = dirname(dir)) {
@@ -347,11 +356,12 @@ export function loadRules(cwd) {
   }
   files.push(join(process.env.AUTOPILOT_HOME || join(homedir(), ".claude", "autopilot"), "guard.json"));
   const rules = { scope: null, allow: [] };
-  for (const f of files) {
+  for (const [n, f] of files.entries()) {
+    const repo = n < files.length - 1;
     try {
       const j = JSON.parse(readFileSync(f, "utf8"));
-      if (Array.isArray(j.allow)) rules.allow.push(...j.allow.filter((a) => typeof a === "string"));
-      if (rules.scope === null && (j.scope === "always" || j.scope === "runs")) rules.scope = j.scope;
+      if (!repo && Array.isArray(j.allow)) rules.allow.push(...j.allow.filter((a) => typeof a === "string"));
+      if (rules.scope === null && (repo ? j.scope === "always" : j.scope === "always" || j.scope === "runs")) rules.scope = j.scope;
     } catch {}
   }
   return rules;

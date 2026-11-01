@@ -17,9 +17,10 @@ const cut = (s) => (s.length > CUT ? s.slice(0, CUT) : s);
 const fwd = (p) => String(p).replace(/\\/g, "/");
 
 /** The repeated problems of one run: [{ kind, evidence: [string] }]. */
-export function problems({ ledger = "", lessons = [] }) {
+export function problems({ ledger = "", lessons = [], date, since = date }) {
   const out = [];
-  for (const l of lessons) if (l.count >= 2) out.push({ kind: "lesson", evidence: [l.text] });
+  // A lesson counts for this run only if it was reinforced since the run began (ledger creation date, else the run date); old repeats are not this run's problem.
+  for (const l of lessons) if (l.count >= 2 && l.last >= since) out.push({ kind: "lesson", evidence: [l.text] });
   const lines = String(ledger).split(/\r?\n/);
   const byTask = new Map();
   for (const l of lines) {
@@ -105,7 +106,13 @@ function main(args) {
   const root = resolve(flag("--out") ?? projectRoot());
   const date = flag("--date") ?? new Date().toISOString().slice(0, 10);
   const a = applicable(load(), projectRoot(root), detectStack(root));
-  const ps = problems({ ledger, lessons: [...a.repo, ...a.stack, ...a.machine] });
+  // shortcut: ledger birthtime is 0 on filesystems without it; then the run date alone bounds the window.
+  let since = date;
+  try {
+    const b = lstatSync(ledgerFile).birthtime;
+    if (b.getTime() > 0) since = [since, b.toISOString().slice(0, 10)].sort()[0];
+  } catch {}
+  const ps = problems({ ledger, lessons: [...a.repo, ...a.stack, ...a.machine], date, since });
   if (!ps.length) return console.log("retro: none");
   const plan = /^# autopilot ledger:\s*(.+)$/m.exec(ledger)?.[1].trim() ?? run;
   const file = proposalPath(root, date, slugOf(plan, run));

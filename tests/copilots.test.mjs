@@ -34,6 +34,16 @@ test("overlaps: equal or directory prefix only", () => {
   assert.ok(!overlaps("skills/cock", "skills/cockpit/x"));
 });
 
+test("overlaps: globs reduce to their literal directory prefix", () => {
+  assert.ok(overlaps("src/**", "src/api/x.ts"));
+  assert.ok(overlaps("web/**/*.ts", "web/app.ts"));
+  assert.ok(overlaps("**/*.ts", "anything/at/all.md"));
+  assert.ok(overlaps("a.js", "*.ts"));
+  assert.ok(!overlaps("src/a", "src/ab"));
+  assert.ok(!overlaps("src/a/**", "src/ab/x.ts"));
+  assert.ok(!overlaps("src/**", "lib/x.ts"));
+});
+
 test("integrated reads ledger lines", () => {
   assert.deepEqual([...integrated("task 03: integrated\ntask 04: started\ntask 05: integrated abc\n")].sort(), ["03", "05"]);
 });

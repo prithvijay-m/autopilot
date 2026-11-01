@@ -1,5 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { classify } from "../scripts/tdd-check.mjs";
 import { node, tempRepo } from "./helpers.mjs";
 
@@ -112,7 +114,6 @@ test("a killed run leaves the tree restored", { skip: process.platform === "win3
   const { r, base } = withMul();
   try {
     const { spawn } = await import("node:child_process");
-    const { join } = await import("node:path");
     const { scripts } = await import("./helpers.mjs");
     const child = spawn(process.execPath, [join(scripts, "tdd-check.mjs"), base, "--", "node -e \"setTimeout(function(){},30000)\""], { cwd: r.dir });
     await new Promise((resolve) => setTimeout(resolve, 1500)); // the source is reverted and the command is running
@@ -120,6 +121,41 @@ test("a killed run leaves the tree restored", { skip: process.platform === "win3
     child.kill("SIGTERM");
     await new Promise((resolve) => child.on("close", resolve));
     assert.equal(r.git("status", "--porcelain", "--untracked-files=no").out, "", "restored after SIGTERM");
+  } finally {
+    r.cleanup();
+  }
+});
+
+// A SIGKILLed run leaves the source reverted plus a marker: base sha, then the reverted paths.
+const killedRun = (r, base, listed = "src/calc.js") => {
+  r.git("checkout", base, "--", "src/calc.js");
+  const marker = join(r.dir, ".git", "tdd-check.dirty");
+  writeFileSync(marker, `${base}\n${listed}\n`);
+  return marker;
+};
+
+test("stale marker, only the reverted files are dirty: the tree is restored", () => {
+  const { r, base } = withMul();
+  try {
+    const marker = killedRun(r, base);
+    const out = check(r, base);
+    assert.match(out.out, /^tdd-check: SKIPPED - a previous run was killed .*restored/);
+    assert.equal(r.git("status", "--porcelain", "--untracked-files=no").out, "");
+    assert.equal(existsSync(marker), false);
+  } finally {
+    r.cleanup();
+  }
+});
+
+test("stale marker, a foreign file is dirty: nothing is reset and the marker stays", () => {
+  const { r, base } = withMul();
+  try {
+    const marker = killedRun(r, base);
+    r.write("package.json", "{\"type\":\"module\",\"mine\":1}\n");
+    const out = check(r, base);
+    assert.match(out.out, /^tdd-check: SKIPPED - a previous run was killed and the tree has other uncommitted changes \(package\.json\); restore the source files yourself \(git checkout HEAD -- src\/calc\.js\)/);
+    assert.equal(readFileSync(join(r.dir, "package.json"), "utf8"), "{\"type\":\"module\",\"mine\":1}\n");
+    assert.equal(existsSync(marker), true);
   } finally {
     r.cleanup();
   }

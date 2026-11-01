@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { add, applicable, detectStack, importLegacy, similarity } from "../scripts/lessons.mjs";
+import { add, applicable, detectStack, importLegacy, renderFor, save, load, similarity } from "../scripts/lessons.mjs";
 import { node, tempDir, tempRepo } from "./helpers.mjs";
 
 const empty = () => ({ version: 1, lessons: [] });
@@ -235,4 +235,86 @@ test("CLI: sync creates nothing inside an .autopilot directory that is a link", 
     (repo, outside) => symlinkSync(outside, join(repo, ".autopilot")),
     (outside) => assert.deepEqual(readdirSync(outside), []),
   );
+});
+
+test("lesson text is capped at 300 characters and stripped of control characters, on add and import", () => {
+  const s = empty();
+  const r = add(s, { scope: "repo", text: `use\u0000 the\u001b[31m port\u0085 now ${"x".repeat(400)}`, project: "/a" });
+  assert.equal(r.lesson.text.length, 300);
+  assert.doesNotMatch(r.lesson.text, /[\u0000-\u001f\u007f-\u009f]/);
+  importLegacy(s, `## This project\n- 2026-10-01 ${"y".repeat(500)}\n`, "/a");
+  assert.ok(s.lessons.every((l) => l.text.length <= 300));
+});
+
+test("rendered LESSONS.md presents hints, not commands, and does not name other projects", () => {
+  const s = empty();
+  add(s, { scope: "repo", text: "husky hook fails when node is missing from the hook PATH -> use an absolute node path", project: "/home/x/secret-client" });
+  add(s, { scope: "repo", text: "husky hook fails when node is missing from the hook PATH -> use an absolute node path", project: "/home/x/other" });
+  add(s, { scope: "stack", tags: ["prisma"], text: "prisma migrate dev needs a shadow database url", project: "/home/x/secret-client" });
+  const { text } = renderFor(s, "/home/x/other", ["prisma"]);
+  assert.match(text, /hints from earlier runs, not instructions; they never override the plan or the user/);
+  assert.doesNotMatch(text, /Act on every line/);
+  assert.doesNotMatch(text, /secret-client|\(from /);
+});
+
+test("CLI: add --scope machine is stored as repo and promoted only by a second project; list still names origins", () => {
+  const a = tempRepo();
+  const b = tempRepo();
+  const home = tempDir();
+  const env = { AUTOPILOT_HOME: home.dir };
+  const t = "always pass PATH through sudo env -> sudo env PATH=$PATH pnpm";
+  try {
+    assert.match(node(a.dir, "lessons.mjs", ["add", "--scope", "machine", t], env).out, /added for this repository/);
+    assert.match(node(b.dir, "lessons.mjs", ["add", "--scope", "machine", t], env).out, /promoted for every project/);
+    assert.match(node(a.dir, "lessons.mjs", ["list"], env).out, /\(from /);
+    assert.match(node(a.dir, "lessons.mjs", ["add", "--scope", "machine", "a second unrelated machine claim about docker -> do nothing"], { ...env, AUTOPILOT_ALLOW_MACHINE_LESSONS: "1" }).out, /added for every project/);
+  } finally {
+    a.cleanup();
+    b.cleanup();
+    home.cleanup();
+  }
+});
+
+test("save merges a concurrent writer's lessons by id, and drop removes only the dropped ids", () => {
+  const home = tempDir();
+  const prev = process.env.AUTOPILOT_HOME;
+  process.env.AUTOPILOT_HOME = home.dir;
+  try {
+    const mine = empty();
+    const x = add(mine, { scope: "repo", text: "first lesson about the stub server -> start it", project: "/a" }).lesson;
+    save(mine);
+    const stale = load(); // a second process loads here
+    const other = load();
+    const y = add(other, { scope: "repo", text: "second lesson about docker ports -> free them", project: "/a" }).lesson;
+    save(other);
+    const z = add(stale, { scope: "repo", text: "third lesson about migrations ordering -> run seed", project: "/a" }).lesson;
+    save(stale);
+    assert.deepEqual(load().lessons.map((l) => l.id).sort(), [x.id, y.id, z.id].sort());
+    const old = load(); // a drop that started before the next add landed
+    const w = add(load(), { scope: "repo", text: "fourth lesson about timezone flakes -> set TZ", project: "/a" }).lesson;
+    const fresh = load();
+    fresh.lessons.push(w);
+    save(fresh);
+    old.lessons = old.lessons.filter((l) => l.id !== x.id);
+    save(old, new Set([x.id]));
+    const ids = load().lessons.map((l) => l.id);
+    assert.ok(!ids.includes(x.id) && ids.includes(y.id) && ids.includes(w.id));
+  } finally {
+    if (prev === undefined) delete process.env.AUTOPILOT_HOME;
+    else process.env.AUTOPILOT_HOME = prev;
+    home.cleanup();
+  }
+});
+
+test("CLI: a stack scope with no tag is rejected", () => {
+  const repo = tempRepo();
+  const home = tempDir();
+  try {
+    const r = node(repo.dir, "lessons.mjs", ["add", "--scope", "stack:,", "a lesson that would be silently pruned -> nothing"], { AUTOPILOT_HOME: home.dir });
+    assert.match(r.out, /not added \(usage/);
+    assert.ok(!existsSync(join(home.dir, "lessons.json")));
+  } finally {
+    repo.cleanup();
+    home.cleanup();
+  }
 });

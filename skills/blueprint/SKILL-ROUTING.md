@@ -2,7 +2,7 @@
 
 Every task names the **specialist skills** its implementer loads before building, on its `Skills` line. A general implementer with the right specialist skill loaded beats a general implementer guessing, so routing is part of planning, and it is decided here, while the user is present.
 
-The session's own skill listing is the source of truth for what is installed. This file holds the pairings that listing cannot tell you.
+The session's own skill listing is the source of truth for what is installed. This file holds the pairings that listing cannot tell you. A skill name here is shorthand: call the Skill tool with the exact name from the session's skill listing - the bare name, or the same skill under any plugin prefix (for example `grilling`, `mattpocock-skills:grilling` or `supermatt:grilling`). If no listed skill matches, say so in one line and carry out the step yourself from first principles; do not stop.
 
 ## Route by what the task touches
 
