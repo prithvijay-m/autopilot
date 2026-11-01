@@ -10,11 +10,11 @@ test("plugin.json names the plugin autopilot", () => {
   assert.equal(load(".claude-plugin/plugin.json").name, "autopilot");
 });
 
-test("every manifest says 0.3.0", () => {
-  assert.equal(load(".claude-plugin/plugin.json").version, "0.3.0");
-  assert.equal(load("package.json").version, "0.3.0");
+test("every manifest says 0.3.1", () => {
+  assert.equal(load(".claude-plugin/plugin.json").version, "0.3.1");
+  assert.equal(load("package.json").version, "0.3.1");
   const entry = load(".claude-plugin/marketplace.json").plugins[0];
-  assert.equal(entry.version, "0.3.0");
+  assert.equal(entry.version, "0.3.1");
 });
 
 test("the marketplace lists autopilot", () => {

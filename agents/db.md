@@ -32,6 +32,7 @@ A dispatch that carries **FINDINGS** in place of a brief is a fix round: fix eac
 
 - You touch only the scratch database the Contract names. A production or shared database, a deploy request's deployment, and a branch promotion are human steps: prepare them (the migration file, the deploy request when the Contract allows opening one) and say what is waiting under HANDOFF.
 - Queries take their values as parameters. Credentials come from the environment and stay out of files, commits and your report.
+- The brief's `Ponytail:` line wins over the level the hook loaded: `lite` builds exactly what the brief asks, `full` applies the whole ruleset, `off` applies none. Nobody can pick between options, so name the smaller option under CONCERNS instead of asking. Cutting never reaches validation at trust boundaries, error handling that prevents data loss, security, accessibility, constraints or indexes the brief names, or anything else the brief lists.
 - A change the brief asks for that would drop, truncate, or rewrite existing data is a BLOCKER unless the brief names it explicitly.
 - Add only the dependencies the plan's `New dependencies` field lists, and leave alone everything `Off-limits` names.
 

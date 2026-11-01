@@ -27,6 +27,8 @@ The agent definitions carry the model tiers, so every dispatch names its `subage
 
 A **dispatch is pointers**: absolute paths to the brief, `spec.md` and `plan.md`, the CARD or IMPACT file, the GRAPH and LESSONS paths, plus the SHAs, branch names and resource assignment the agent needs. File contents, diffs and earlier reports stay out of it, since everything you paste or receive stays in your context for the rest of the run. Between tool calls, narrate at most one short line.
 
+A **Ponytail level** goes on every `coder`, `ux`, `db` and `senior` dispatch as `Ponytail: <lite|full|off>`. The Ponytail hooks load the user's one machine-wide level into every agent, so only this line can set it per task. Read it off the brief: `lite` when the brief fixes exact names, signatures or copy, or the task is `Security: yes`, a migration, or tests only (build what it says and name the smaller option); `full` for everything else, and whenever you are unsure; `off` for output the plan asks for in full (generated files, scaffolding). Never `ultra`: it pushes back on the request, and nobody is here to answer. Omit the line when the plan's Constraints say Ponytail is off.
+
 ## The scripts
 
 All live in `${CLAUDE_PLUGIN_ROOT}/scripts/`, run from the repository root, cost no model tokens, and print one summary line.

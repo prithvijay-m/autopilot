@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.1
+
+**Ponytail levels**
+- When the user has the Ponytail plugin installed, its one machine-wide level reaches every agent. The conductor now puts `Ponytail: <lite|full|off>` on each `coder`, `ux`, `db` and `senior` dispatch, so the level follows the task: `lite` for briefs with exact names or copy, `Security: yes`, migrations and test-only tasks; `full` otherwise; `off` for output the plan wants in full. Never `ultra`, since nobody is there to answer its pushback.
+- Builders obey the brief's `Ponytail:` line over the loaded level. They name the smaller option under CONCERNS instead of asking, and cutting never reaches trust-boundary validation, data-loss error handling, security or accessibility.
+
 ## 0.3.0
 
 A build started on 0.2.x keeps its ledger at the old path: finish it on 0.2.x.
